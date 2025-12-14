@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Waybill, WaybillStatus } from '../../types';
-import { 
-    useChangeWaybillStatus, 
-    useChangeWaybillStatusBulk, 
+import {
+    useChangeWaybillStatus,
+    useChangeWaybillStatusBulk,
     useDeleteWaybill,
     useVehicles,
     useEmployees,
     useOrganizations,
     useAppSettings,
     useWaybillsPaged,
-    useFuelTypes 
+    useFuelTypes
 } from '../../hooks/queries';
 import { validateBatchCorrection, fetchWaybillById, fixWaybillDates } from '../../services/mockApi';
 import { WaybillDetail } from './WaybillDetail';
@@ -20,9 +20,9 @@ import PrintableWaybill from './PrintableWaybill';
 import Modal from '../shared/Modal';
 import ConfirmationModal from '../shared/ConfirmationModal';
 import { useToast } from '../../hooks/useToast';
-import { 
-    PlusIcon, PencilIcon, TrashIcon, 
-    CheckCircleIcon, ArrowUturnLeftIcon, 
+import {
+    PlusIcon, PencilIcon, TrashIcon,
+    CheckCircleIcon, ArrowUturnLeftIcon,
     SparklesIcon, PrinterIcon, CalendarDaysIcon,
     ArrowUpIcon, ArrowDownIcon, ExcelIcon, ArrowPathIcon,
     WrenchScrewdriverIcon, ShieldCheckIcon, FunnelIcon
@@ -48,7 +48,7 @@ const dateSorter = (rowA: any, rowB: any, columnId: string) => {
     const toNum = (str: any) => {
         if (!str || typeof str !== 'string') return 0;
         if (str.includes('-')) {
-             return Number(str.replace(/\D/g, '').substring(0, 8));
+            return Number(str.replace(/\D/g, '').substring(0, 8));
         }
         const parts = str.split('.');
         if (parts.length === 3) {
@@ -82,10 +82,10 @@ interface ColumnConfig {
     id: string; // Used as key for DnD
     key: string; // Used for persistence hook
     label: React.ReactNode;
-    sortKey?: keyof EnrichedWaybill | 'date'; 
+    sortKey?: keyof EnrichedWaybill | 'date';
     sortType?: (a: any, b: any, id: string) => number;
     render: (row: EnrichedWaybill) => React.ReactNode;
-    className?: string; 
+    className?: string;
 }
 
 const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpened }) => {
@@ -97,17 +97,17 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     const [page, setPage] = useState(1);
     const pageSize = 20;
 
-    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ 
-        key: 'date', 
-        direction: 'desc' 
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
+        key: 'date',
+        direction: 'desc'
     });
 
     const [filters, setFilters] = useState(() => {
         const now = new Date();
         const start = new Date(now.getFullYear(), now.getMonth(), 1);
         const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        const toISO = (d: Date) => d.toLocaleDateString('sv-SE'); 
-        
+        const toISO = (d: Date) => d.toLocaleDateString('sv-SE');
+
         return {
             dateFrom: toISO(start),
             dateTo: toISO(end),
@@ -116,7 +116,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
             driverId: '',
         };
     });
-    
+
     const { data: pagedData, isLoading, isFetching, refetch } = useWaybillsPaged({
         page,
         pageSize,
@@ -136,19 +136,19 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
     const [isCheckModalOpen, setIsCheckModalOpen] = useState(false);
     const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
-    const [isExcelImportModalOpen, setIsExcelImportModalOpen] = useState(false); 
+    const [isExcelImportModalOpen, setIsExcelImportModalOpen] = useState(false);
     const [isSeasonModalOpen, setIsSeasonModalOpen] = useState(false);
     const [isRecalcChainModalOpen, setIsRecalcChainModalOpen] = useState(false);
-    
+
     const [waybillToPrint, setWaybillToPrint] = useState<Waybill | null>(null);
-    
+
     // Actions
     const [deleteConfirm, setDeleteConfirm] = useState<Waybill | null>(null);
     const [bulkDeleteIds, setBulkDeleteIds] = useState<string[] | null>(null);
     const [statusChangeConfirm, setStatusChangeConfirm] = useState<{ ids: string[]; status: WaybillStatus } | null>(null);
     const [isBulkProcessing, setIsBulkProcessing] = useState(false);
     const [bulkProgress, setBulkProgress] = useState<{ processed: number; total: number } | null>(null);
-    
+
     const [markBlanksAsSpoiled, setMarkBlanksAsSpoiled] = useState(false);
 
     // Data Hooks
@@ -169,9 +169,9 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     // --- Columns ---
     // Note: 'key' property is required for useColumnPersistence
     const extendedColumnsConfig = useMemo<ColumnConfig[]>(() => [
-        { 
+        {
             id: 'number', key: 'number',
-            label: '№ ПЛ', 
+            label: '№ ПЛ',
             sortKey: 'number',
             render: (w) => (
                 <div className="flex flex-col">
@@ -180,11 +180,11 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                 </div>
             )
         },
-        { 
+        {
             id: 'validFrom', key: 'validFrom',
-            label: 'Выезд', 
+            label: 'Выезд',
             sortKey: 'validFrom',
-            sortType: dateSorter, 
+            sortType: dateSorter,
             render: (w) => (
                 <div className="flex flex-col">
                     <span className="text-gray-900 dark:text-gray-200">{w.depDateStr}</span>
@@ -192,11 +192,11 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                 </div>
             )
         },
-        { 
+        {
             id: 'validTo', key: 'validTo',
-            label: 'Возврат', 
+            label: 'Возврат',
             sortKey: 'validTo',
-            sortType: dateSorter, 
+            sortType: dateSorter,
             render: (w) => (
                 <div className="flex flex-col">
                     <span className="text-gray-900 dark:text-gray-200">{w.retDateStr}</span>
@@ -204,44 +204,44 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                 </div>
             )
         },
-        { 
+        {
             id: 'odometerStart', key: 'odometerStart',
-            label: <>Одометр<br/><span className="text-[10px] font-normal text-gray-500">начало</span></>, 
+            label: <>Одометр<br /><span className="text-[10px] font-normal text-gray-500">начало</span></>,
             sortKey: 'odometerStart',
             className: 'text-right font-mono text-gray-700 dark:text-gray-300',
             render: (w) => w.odometerStart
         },
-        { 
+        {
             id: 'odometerEnd', key: 'odometerEnd',
-            label: <>Одометр<br/><span className="text-[10px] font-normal text-gray-500">конец</span></>, 
+            label: <>Одометр<br /><span className="text-[10px] font-normal text-gray-500">конец</span></>,
             sortKey: 'odometerEnd',
             className: 'text-right font-mono text-gray-700 dark:text-gray-300',
             render: (w) => w.odometerEnd || '-'
         },
-        { 
+        {
             id: 'mileage', key: 'mileage',
-            label: 'Пробег', 
+            label: 'Пробег',
             sortKey: 'mileage',
             className: 'text-right font-bold text-gray-900 dark:text-white',
             render: (w) => w.mileage
         },
-        { 
+        {
             id: 'fuelAtStart', key: 'fuelAtStart',
-            label: <>Топливо<br/><span className="text-[10px] font-normal text-gray-500">начало</span></>, 
+            label: <>Топливо<br /><span className="text-[10px] font-normal text-gray-500">начало</span></>,
             sortKey: 'fuelAtStart',
             className: 'text-right font-mono',
             render: (w) => <span className={(w.fuelAtStart || 0) < 0 ? 'text-red-600 font-bold' : 'text-gray-700 dark:text-gray-300'}>{(w.fuelAtStart || 0).toFixed(2)}</span>
         },
-        { 
+        {
             id: 'fuelAtEnd', key: 'fuelAtEnd',
-            label: <>Топливо<br/><span className="text-[10px] font-normal text-gray-500">конец</span></>, 
+            label: <>Топливо<br /><span className="text-[10px] font-normal text-gray-500">конец</span></>,
             sortKey: 'fuelAtEnd',
             className: 'text-right font-mono',
             render: (w) => <span className={(w.fuelAtEnd || 0) < 0 ? 'text-red-600 font-bold' : 'text-gray-700 dark:text-gray-300'}>{(w.fuelAtEnd || 0).toFixed(2)}</span>
         },
-        { 
+        {
             id: 'status', key: 'status',
-            label: 'Статус', 
+            label: 'Статус',
             sortKey: 'status',
             render: (w) => (
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${WAYBILL_STATUS_COLORS[w.status]?.bg} ${WAYBILL_STATUS_COLORS[w.status]?.text} border-transparent`}>
@@ -252,22 +252,22 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     ], []);
 
     const standardColumnsConfig = useMemo<ColumnConfig[]>(() => [
-        { 
+        {
             id: 'number', key: 'number',
-            label: '№ ПЛ', 
+            label: '№ ПЛ',
             sortKey: 'number',
             render: (w) => <span className="font-medium text-gray-900 dark:text-white">{w.number}</span>
         },
-        { 
+        {
             id: 'date', key: 'date',
-            label: 'Дата', 
+            label: 'Дата',
             sortKey: 'date',
-            sortType: dateSorter, 
+            sortType: dateSorter,
             render: (w) => w.docDateStr
         },
-        { 
+        {
             id: 'vehicle', key: 'vehicle',
-            label: 'Транспорт', 
+            label: 'Транспорт',
             sortKey: 'vehicleId',
             render: (w) => (
                 <div className="flex flex-col">
@@ -276,15 +276,15 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                 </div>
             )
         },
-        { 
+        {
             id: 'driver', key: 'driver',
-            label: 'Водитель', 
+            label: 'Водитель',
             sortKey: 'driverId',
             render: (w) => <span className="text-gray-700 dark:text-gray-300">{w.driverName}</span>
         },
-        { 
+        {
             id: 'status', key: 'status',
-            label: 'Статус', 
+            label: 'Статус',
             sortKey: 'status',
             render: (w) => (
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${WAYBILL_STATUS_COLORS[w.status]?.bg} ${WAYBILL_STATUS_COLORS[w.status]?.text} border-transparent`}>
@@ -297,9 +297,9 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     // --- DnD Column Hook ---
     const initialColumns = isExtendedMode ? extendedColumnsConfig : standardColumnsConfig;
     const tableId = isExtendedMode ? 'waybill-list-extended' : 'waybill-list-standard';
-    
+
     const { columns, sensors, onDragEnd } = useColumnPersistence(initialColumns, tableId);
-    
+
     const [activeColId, setActiveColId] = useState<string | null>(null);
     const activeColumn = columns.find(c => c.id === activeColId);
 
@@ -324,7 +324,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
             showToast('Нельзя удалить проведенный ПЛ. Сначала отмените проведение.', 'error');
             return;
         }
-        setMarkBlanksAsSpoiled(false); 
+        setMarkBlanksAsSpoiled(false);
         setDeleteConfirm(wb);
     };
 
@@ -378,7 +378,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
             const vehicle = vehicles.find(v => v.id === w.vehicleId);
             const driver = employees.find(e => e.id === w.driverId);
             const org = organizations.find(o => o.id === w.organizationId);
-            
+
             const depDate = w.validFrom ? new Date(w.validFrom) : null;
             const retDate = w.validTo ? new Date(w.validTo) : null;
             const docDate = w.date ? new Date(w.date) : null;
@@ -401,12 +401,12 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
         return enriched.sort((a, b) => {
             const { key, direction } = sortConfig;
             if (['date', 'validFrom', 'validTo', 'number', 'status', 'odometerStart', 'odometerEnd', 'fuelAtStart', 'fuelAtEnd', 'fuelPlanned', 'mileage'].includes(key)) {
-                 return 0; 
+                return 0;
             }
             const column = columns.find(c => c.sortKey === key);
             if (column?.sortType) {
-                 const res = column.sortType(a, b, key);
-                 return direction === 'asc' ? res : -res;
+                const res = column.sortType(a, b, key);
+                return direction === 'asc' ? res : -res;
             }
             let valA = a[key as keyof EnrichedWaybill];
             let valB = b[key as keyof EnrichedWaybill];
@@ -458,15 +458,15 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
         const { ids, status } = statusChangeConfirm;
         setIsBulkProcessing(true);
         setBulkProgress({ processed: 0, total: ids.length });
-        
+
         try {
             await changeStatusBulkMutation.mutateAsync({
                 ids,
                 status,
-                context: { 
+                context: {
                     userId: currentUser?.id,
                     appMode: settings?.appMode,
-                    reason: status === WaybillStatus.DRAFT ? 'Массовая корректировка' : undefined 
+                    reason: status === WaybillStatus.DRAFT ? 'Массовая корректировка' : undefined
                 }
             });
             showToast(`Статус обновлен для ${ids.length} документов`, 'success');
@@ -484,12 +484,12 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     const handleBulkDeleteClick = () => {
         const ids = Array.from(selectedIds) as string[];
         const hasPosted = processedData.some(w => ids.includes(w.id) && w.status === WaybillStatus.POSTED);
-        
+
         if (hasPosted) {
             showToast('В выборке есть проведенные ПЛ. Удаление невозможно.', 'error');
             return;
         }
-        setMarkBlanksAsSpoiled(false); 
+        setMarkBlanksAsSpoiled(false);
         setBulkDeleteIds(ids);
     };
 
@@ -531,9 +531,9 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
         }
         const data: any[][] = [];
         data.push([
-            "№ ПЛ", "Статус", "Дата документа", 
+            "№ ПЛ", "Статус", "Дата документа",
             "Выезд (дата)", "Выезд (время)", "Возврат (дата)", "Возврат (время)",
-            "ТС", "Водитель", "Организация", "Пробег (км)", 
+            "ТС", "Водитель", "Организация", "Пробег (км)",
             "Топливо (нач)", "Топливо (кон)", "Расход (норма)", "Заправлено"
         ]);
         for (const row of selectedRows) {
@@ -600,12 +600,12 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                         {totalCount}
                     </span>
                 </div>
-                
+
                 <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
                     {/* View Switcher */}
                     <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 cursor-pointer select-none mr-auto xl:mr-2">
                         <div className="relative inline-block w-9 h-5 align-middle select-none transition duration-200 ease-in">
-                            <input type="checkbox" checked={isExtendedMode} onChange={(e) => setIsExtendedMode(e.target.checked)} className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300 checked:right-0 checked:border-blue-600"/>
+                            <input type="checkbox" checked={isExtendedMode} onChange={(e) => setIsExtendedMode(e.target.checked)} className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-gray-300 checked:right-0 checked:border-blue-600" />
                             <label className="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
                         </div>
                         <span className="font-medium">Расширенный</span>
@@ -613,14 +613,14 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
 
                     {/* Utility Group */}
                     <div className="flex items-center gap-2 overflow-x-auto pb-1 xl:pb-0">
-                         <button onClick={() => setIsCheckModalOpen(true)} className={btnUtility} title="Проверить путевые листы">
+                        <button onClick={() => setIsCheckModalOpen(true)} className={btnUtility} title="Проверить путевые листы">
                             <ShieldCheckIcon className="h-4 w-4 text-gray-500" /> Проверка
                         </button>
                         <button onClick={() => setIsSeasonModalOpen(true)} className={btnUtility} title="Настройки сезонов">
                             <CalendarDaysIcon className="h-4 w-4 text-gray-500" /> Сезоны
                         </button>
-                         <button onClick={handleFixDates} className={btnUtility} title="Исправить формат дат">
-                             <WrenchScrewdriverIcon className="h-4 w-4 text-gray-500" /> Даты
+                        <button onClick={handleFixDates} className={btnUtility} title="Исправить формат дат">
+                            <WrenchScrewdriverIcon className="h-4 w-4 text-gray-500" /> Даты
                         </button>
                         {can('waybill.create') && (
                             <button onClick={() => setIsRecalcChainModalOpen(true)} className={btnUtility} title="Пересчитать цепочку">
@@ -644,7 +644,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                             </>
                         )}
                     </div>
-                    
+
                     {/* Primary Action */}
                     {can('waybill.create') && (
                         <button onClick={handleCreate} className={btnPrimary}>
@@ -659,21 +659,21 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                 <div className="flex items-center gap-2 text-gray-500 text-sm font-medium mr-2">
                     <FunnelIcon className="h-4 w-4" /> Фильтры:
                 </div>
-                <input type="date" className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" value={filters.dateFrom} onChange={e => handleFilterChange({...filters, dateFrom: e.target.value})} />
+                <input type="date" className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" value={filters.dateFrom} onChange={e => handleFilterChange({ ...filters, dateFrom: e.target.value })} />
                 <span className="text-gray-400 text-sm">–</span>
-                <input type="date" className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" value={filters.dateTo} onChange={e => handleFilterChange({...filters, dateTo: e.target.value})} />
-                
-                <select className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white min-w-[140px]" value={filters.status} onChange={e => handleFilterChange({...filters, status: e.target.value as any})}>
+                <input type="date" className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" value={filters.dateTo} onChange={e => handleFilterChange({ ...filters, dateTo: e.target.value })} />
+
+                <select className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white min-w-[140px]" value={filters.status} onChange={e => handleFilterChange({ ...filters, status: e.target.value as any })}>
                     <option value="">Все статусы</option>
                     {Object.values(WaybillStatus).map(s => <option key={s} value={s}>{WAYBILL_STATUS_TRANSLATIONS[s]}</option>)}
                 </select>
 
-                <select className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white min-w-[140px]" value={filters.vehicleId} onChange={e => handleFilterChange({...filters, vehicleId: e.target.value})}>
+                <select className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white min-w-[140px]" value={filters.vehicleId} onChange={e => handleFilterChange({ ...filters, vehicleId: e.target.value })}>
                     <option value="">Все ТС</option>
                     {vehicles.map(v => <option key={v.id} value={v.id}>{v.plateNumber}</option>)}
                 </select>
 
-                <select className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white min-w-[140px]" value={filters.driverId} onChange={e => handleFilterChange({...filters, driverId: e.target.value})}>
+                <select className="p-2 text-sm border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white min-w-[140px]" value={filters.driverId} onChange={e => handleFilterChange({ ...filters, driverId: e.target.value })}>
                     <option value="">Все водители</option>
                     {employees.filter(e => e.employeeType === 'driver').map(d => <option key={d.id} value={d.id}>{d.shortName}</option>)}
                 </select>
@@ -688,19 +688,19 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                 <div className="flex flex-wrap items-center gap-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg animate-fade-in shadow-sm">
                     <span className="font-semibold text-blue-800 dark:text-blue-300 text-sm ml-2">Выбрано: {selectedIds.size}</span>
                     <div className="h-4 w-px bg-blue-200 dark:bg-blue-700"></div>
-                    
+
                     {can('waybill.post') && (
                         <button onClick={() => handleBulkStatusChange(WaybillStatus.POSTED)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors">
                             <CheckCircleIcon className="h-4 w-4" /> Провести
                         </button>
                     )}
-                    
+
                     {can('waybill.correct') && (
                         <button onClick={() => handleBulkStatusChange(WaybillStatus.DRAFT)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-yellow-500 text-white hover:bg-yellow-600 transition-colors">
                             <ArrowUturnLeftIcon className="h-4 w-4" /> Корректировка
                         </button>
                     )}
-                    
+
                     <button onClick={handleBulkDeleteClick} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors">
                         <TrashIcon className="h-4 w-4" /> Удалить
                     </button>
@@ -713,8 +713,8 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
 
             {/* --- TABLE WITH DnD --- */}
             <DndContext
-                sensors={sensors} 
-                collisionDetection={closestCenter} 
+                sensors={sensors}
+                collisionDetection={closestCenter}
                 onDragEnd={(e) => { setActiveColId(null); onDragEnd(e); }}
                 onDragStart={(e) => setActiveColId(String(e.active.id))}
             >
@@ -728,11 +728,11 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                                     </th>
                                     <SortableContext items={columns.map(c => c.id)} strategy={horizontalListSortingStrategy}>
                                         {columns.map((col) => (
-                                            <SortableHeader 
-                                                key={col.id} 
-                                                id={col.id} 
+                                            <SortableHeader
+                                                key={col.id}
+                                                id={col.id}
                                                 asTh
-                                                className={`p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors select-none whitespace-nowrap bg-gray-50 dark:bg-gray-800 ${col.className || ''}`}
+                                                className={`p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors select-none whitespace-nowrap bg-gray-50 dark:bg-gray-800 ${col.className?.includes('text-right') ? 'text-right' : ''}`}
                                                 onClick={() => col.sortKey && handleSort(col.sortKey as string)}
                                             >
                                                 <div className={`flex items-center gap-1 ${col.className?.includes('text-right') ? 'justify-end' : ''}`}>
@@ -803,7 +803,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                             </tbody>
                         </table>
                     </div>
-                    
+
                     {/* Pagination */}
                     <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
                         <span className="text-sm text-gray-600 dark:text-gray-400">
@@ -844,17 +844,17 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
 
             {/* Modals Injection */}
             {isDetailModalOpen && (
-                <Modal 
-                    isOpen={true} 
-                    onClose={handleDetailClose} 
+                <Modal
+                    isOpen={true}
+                    onClose={handleDetailClose}
                     title={selectedWaybill ? `ПЛ №${selectedWaybill.number}` : "Новый путевой лист"}
                     isDraggable={true}
                     isResizable={true}
                 >
-                    <WaybillDetail 
-                        waybill={selectedWaybill} 
-                        onClose={handleDetailClose} 
-                        isPrefill={!selectedWaybill} 
+                    <WaybillDetail
+                        waybill={selectedWaybill}
+                        onClose={handleDetailClose}
+                        isPrefill={!selectedWaybill}
                     />
                 </Modal>
             )}
@@ -870,7 +870,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
             {isExcelImportModalOpen && (
                 <ExcelImportModal onClose={() => setIsExcelImportModalOpen(false)} onSuccess={() => { refetch(); }} />
             )}
-            
+
             {isSeasonModalOpen && (
                 <SeasonSettingsModal isOpen={true} onClose={() => setIsSeasonModalOpen(false)} />
             )}
@@ -878,9 +878,9 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
             {isRecalcChainModalOpen && (
                 <RecalculateChainModal onClose={() => setIsRecalcChainModalOpen(false)} onSuccess={() => refetch()} />
             )}
-            
+
             {waybillToPrint && (
-                <PrintableWaybill 
+                <PrintableWaybill
                     {...getPrintProps(waybillToPrint)}
                     onClose={() => setWaybillToPrint(null)}
                 />
@@ -898,9 +898,9 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
             >
                 <div className="mt-4">
                     <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                            type="checkbox" 
-                            checked={markBlanksAsSpoiled} 
+                        <input
+                            type="checkbox"
+                            checked={markBlanksAsSpoiled}
                             onChange={(e) => setMarkBlanksAsSpoiled(e.target.checked)}
                             className="rounded border-gray-300 text-red-600 focus:ring-red-500"
                         />
@@ -946,9 +946,9 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
             >
                 <div className="mt-4">
                     <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                            type="checkbox" 
-                            checked={markBlanksAsSpoiled} 
+                        <input
+                            type="checkbox"
+                            checked={markBlanksAsSpoiled}
                             onChange={(e) => setMarkBlanksAsSpoiled(e.target.checked)}
                             className="rounded border-gray-300 text-red-600 focus:ring-red-500"
                         />

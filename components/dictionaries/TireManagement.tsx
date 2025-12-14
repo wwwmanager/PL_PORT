@@ -30,14 +30,14 @@ const tireSchema = z.object({
     purchasePrice: z.number().optional().nullable(),
     startDepth: z.number().optional().nullable(),
     currentDepth: z.number().optional().nullable(),
-    
+
     // Lifecycle
     installDate: z.string().optional().nullable(),
     installOdometer: z.number().optional().nullable(),
     estimatedLifespanKm: z.number().optional().nullable(),
     disposalDate: z.string().optional().nullable(),
     utilizationDate: z.string().optional().nullable(),
-    
+
     notes: z.string().optional().nullable(),
 }).superRefine((data, ctx) => {
     if (data.status === 'Mounted' && !data.currentVehicleId) {
@@ -60,11 +60,11 @@ type TireFormData = z.infer<typeof tireSchema>;
 
 // --- Components ---
 const FormField: React.FC<{ label: string; children: React.ReactNode; error?: string }> = ({ label, children, error }) => (
-  <div>
-    <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{label}</label>
-    {children}
-    {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-  </div>
+    <div>
+        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{label}</label>
+        {children}
+        {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+    </div>
 );
 const FormInput = (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2" />;
 const FormSelect = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => <select {...props} className="w-full bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-md p-2" />;
@@ -82,13 +82,13 @@ interface TireGroupRow {
     vehicleName: string;
     vehicleId: string | null;
     installDate: string | null;
-    
+
     // Aggregate data for display
     avgMileage: number;
     winterMileage: number;
     summerMileage: number;
     estimatedLifespanKm: number;
-    
+
     ids: string[]; // All IDs in this group
 }
 
@@ -101,10 +101,10 @@ const TireManagement: React.FC = () => {
     const [currentItem, setCurrentItem] = useState<Partial<Tire> | null>(null);
     const [deleteModal, setDeleteModal] = useState<string[] | null>(null);
     const [depreciationMethod, setDepreciationMethod] = useState<'seasonal' | 'usage'>('usage');
-    
+
     // State for custom confirmation
     const [isCloseConfirmationOpen, setIsCloseConfirmationOpen] = useState(false);
-    
+
     const { showToast } = useToast();
 
     const { register, handleSubmit, reset, watch, setValue, formState: { errors, isDirty } } = useForm<TireFormData>({ resolver: zodResolver(tireSchema) });
@@ -112,8 +112,8 @@ const TireManagement: React.FC = () => {
 
     const fetchData = useCallback(async () => {
         const [tiresData, vehiclesData, storagesData, stockItemsData, appSettings] = await Promise.all([
-            getTires(), 
-            getVehicles(), 
+            getTires(),
+            getVehicles(),
             fetchStorages(),
             getGarageStockItems(),
             getAppSettings()
@@ -129,17 +129,17 @@ const TireManagement: React.FC = () => {
 
     const groupedData = useMemo(() => {
         const groups = new Map<string, TireGroupRow>();
-        
+
         tires.forEach(t => {
             const locKey = t.status === 'Mounted' ? `veh:${t.currentVehicleId}` : (t.status === 'InStock' ? `sto:${t.storageLocationId}` : 'disp');
             const dateKey = t.installDate || 'no-date';
             const key = `${t.brand}|${t.model}|${t.size}|${t.status}|${locKey}|${dateKey}`;
-            
+
             if (!groups.has(key)) {
                 const vehicle = vehicles.find(v => v.id === t.currentVehicleId);
-                const locationDisplay = t.status === 'Mounted' 
+                const locationDisplay = t.status === 'Mounted'
                     ? (vehicle ? `${vehicle.plateNumber} ${vehicle.brand}` : 'Неизвестное ТС')
-                    : t.status === 'InStock' 
+                    : t.status === 'InStock'
                         ? (storages.find(s => s.id === t.storageLocationId)?.name || 'Неизвестный склад')
                         : 'Списана';
 
@@ -162,7 +162,7 @@ const TireManagement: React.FC = () => {
                     ids: []
                 });
             }
-            
+
             const group = groups.get(key)!;
             group.count++;
             group.ids.push(t.id);
@@ -200,7 +200,7 @@ const TireManagement: React.FC = () => {
     const handleAddNew = () => {
         reset({
             quantity: 1, stockItemId: '',
-            brand: '', model: '', size: '', season: 'Summer', status: 'InStock', condition: 'New', 
+            brand: '', model: '', size: '', season: 'Summer', status: 'InStock', condition: 'New',
             currentVehicleId: '', storageLocationId: '', startDepth: 8, currentDepth: 8,
             purchaseDate: new Date().toISOString().split('T')[0], purchasePrice: 0,
             installDate: '', installOdometer: 0, estimatedLifespanKm: 60000
@@ -211,13 +211,13 @@ const TireManagement: React.FC = () => {
     const handleEdit = (groupId: string) => {
         const group = groupedData.find(g => g.id === groupId);
         if (!group) return;
-        
+
         const tire = tires.find(t => t.id === groupId);
         if (!tire) return;
 
-        reset({ 
-            ...tire, 
-            quantity: group.count, 
+        reset({
+            ...tire,
+            quantity: group.count,
         });
         setIsModalOpen(true);
     };
@@ -246,25 +246,25 @@ const TireManagement: React.FC = () => {
         const parts = item.name.split(' ');
         let brand = '';
         let model = '';
-        
-        if (parts.length > 1) brand = parts[0]; 
+
+        if (parts.length > 1) brand = parts[0];
         if (parts.length > 2) model = parts.slice(1).join(' ');
 
         setValue('brand', brand);
         setValue('model', model);
-        
+
         if (item.lastPurchasePrice) setValue('purchasePrice', item.lastPurchasePrice);
-        
+
         if (item.storageLocation) {
-             const storage = storages.find(s => s.name === item.storageLocation);
-             if (storage) setValue('storageLocationId', storage.id);
+            const storage = storages.find(s => s.name === item.storageLocation);
+            if (storage) setValue('storageLocationId', storage.id);
         }
     };
 
     const tireStockItems = useMemo(() => {
-        return stockItems.filter(i => 
-            i.group === 'Шины' || 
-            i.name.toLowerCase().includes('шина') || 
+        return stockItems.filter(i =>
+            i.group === 'Шины' ||
+            i.name.toLowerCase().includes('шина') ||
             i.name.toLowerCase().includes('резина')
         );
     }, [stockItems]);
@@ -288,15 +288,15 @@ const TireManagement: React.FC = () => {
                 const count = data.quantity || 1;
                 for (let i = 0; i < count; i++) {
                     const payload: any = { ...data };
-                    delete payload.quantity; 
-                    
+                    delete payload.quantity;
+
                     if (data.status !== 'Mounted') payload.currentVehicleId = null;
                     if (data.status !== 'InStock') payload.storageLocationId = null;
 
                     await addTire(payload);
                 }
             }
-            
+
             showToast('Данные сохранены');
             handleForceClose();
             fetchData();
@@ -330,9 +330,9 @@ const TireManagement: React.FC = () => {
 
     // Columns config for DataTable
     const columnsConfig = [
-        { 
-            key: 'brand', 
-            label: 'Бренд/Модель', 
+        {
+            key: 'brand',
+            label: 'Бренд/Модель',
             sortable: true,
             render: (g: TireGroupRow) => (
                 <div>
@@ -342,27 +342,27 @@ const TireManagement: React.FC = () => {
             )
         },
         { key: 'size', label: 'Размер', sortable: true },
-        { 
-            key: 'season', 
-            label: 'Сезон', 
+        {
+            key: 'season',
+            label: 'Сезон',
             sortable: true,
             render: (g: TireGroupRow) => g.season === 'Summer' ? 'Лето' : g.season === 'Winter' ? 'Зима' : 'Всесезон'
         },
-        { 
-            key: 'count', 
-            label: 'Кол-во', 
+        {
+            key: 'count',
+            label: 'Кол-во',
             sortable: true,
             render: (g: TireGroupRow) => <span className="font-bold text-gray-900 dark:text-white">{g.count}</span>
         },
-        { 
-            key: 'status', 
-            label: 'Статус', 
+        {
+            key: 'status',
+            label: 'Статус',
             sortable: true,
             render: (g: TireGroupRow) => getStatusBadge(g.status)
         },
-        { 
-            key: 'avgMileage', 
-            label: 'Пробег (Общ/Зима/Лето)', 
+        {
+            key: 'avgMileage',
+            label: 'Пробег (Общ/Зима/Лето)',
             sortable: true,
             render: (g: TireGroupRow) => (
                 <div>
@@ -371,9 +371,9 @@ const TireManagement: React.FC = () => {
                 </div>
             )
         },
-        { 
-            key: 'estimatedLifespanKm', 
-            label: 'Ресурс', 
+        {
+            key: 'estimatedLifespanKm',
+            label: 'Ресурс',
             sortable: true,
             render: (g: TireGroupRow) => {
                 const percent = g.estimatedLifespanKm > 0 ? Math.round((g.avgMileage / g.estimatedLifespanKm) * 100) : 0;
@@ -383,15 +383,15 @@ const TireManagement: React.FC = () => {
                         <div className="text-xs text-gray-500 mb-1">{g.estimatedLifespanKm} км</div>
                         <div className={`font-bold text-xs ${color}`}>{percent}% износа</div>
                         <div className="w-16 h-1.5 bg-gray-200 rounded-full mt-1 overflow-hidden">
-                            <div className={`h-full ${percent > 90 ? 'bg-red-500' : 'bg-green-500'}`} style={{width: `${Math.min(100, percent)}%`}}></div>
+                            <div className={`h-full ${percent > 90 ? 'bg-red-500' : 'bg-green-500'}`} style={{ width: `${Math.min(100, percent)}%` }}></div>
                         </div>
                     </div>
                 );
             }
         },
-        { 
-            key: 'locationDisplay', 
-            label: 'Местоположение', 
+        {
+            key: 'locationDisplay',
+            label: 'Местоположение',
             sortable: true,
             render: (g: TireGroupRow) => (
                 <div>
@@ -405,12 +405,12 @@ const TireManagement: React.FC = () => {
     return (
         <div>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 px-1">
-                 <div>
-                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Учет шин</h3>
-                     <p className="text-sm text-gray-500 dark:text-gray-400">Управление комплектами и списание.</p>
-                 </div>
-                 
-                 <div className="flex flex-wrap gap-4 items-center">
+                <div>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Учет шин</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Управление комплектами и списание.</p>
+                </div>
+
+                <div className="flex flex-wrap gap-4 items-center">
                     <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg p-2 flex items-center gap-3">
                         <div className="flex items-center gap-2 px-2 border-r border-gray-300 dark:border-gray-600">
                             <CogIcon className="h-4 w-4 text-gray-500" />
@@ -418,22 +418,22 @@ const TireManagement: React.FC = () => {
                         </div>
                         <div className="flex gap-3 px-1">
                             <label className="flex items-center gap-1.5 cursor-pointer">
-                                <input 
-                                    type="radio" 
-                                    name="depreciationMethod" 
-                                    value="usage" 
-                                    checked={depreciationMethod === 'usage'} 
+                                <input
+                                    type="radio"
+                                    name="depreciationMethod"
+                                    value="usage"
+                                    checked={depreciationMethod === 'usage'}
                                     onChange={() => handleMethodChange('usage')}
                                     className="h-3.5 w-3.5 text-blue-600 border-gray-300 focus:ring-blue-500"
                                 />
                                 <span className="text-xs text-gray-700 dark:text-gray-300">По факту</span>
                             </label>
                             <label className="flex items-center gap-1.5 cursor-pointer">
-                                <input 
-                                    type="radio" 
-                                    name="depreciationMethod" 
-                                    value="seasonal" 
-                                    checked={depreciationMethod === 'seasonal'} 
+                                <input
+                                    type="radio"
+                                    name="depreciationMethod"
+                                    value="seasonal"
+                                    checked={depreciationMethod === 'seasonal'}
                                     onChange={() => handleMethodChange('seasonal')}
                                     className="h-3.5 w-3.5 text-blue-600 border-gray-300 focus:ring-blue-500"
                                 />
@@ -442,13 +442,13 @@ const TireManagement: React.FC = () => {
                         </div>
                     </div>
 
-                    <button 
-                        onClick={handleAddNew} 
+                    <button
+                        onClick={handleAddNew}
                         className="flex items-center gap-2 bg-blue-600 text-white font-medium py-2 px-4 rounded-lg shadow-sm hover:bg-blue-700 transition-all active:scale-95"
                     >
                         <PlusIcon className="h-5 w-5" /> Добавить
                     </button>
-                 </div>
+                </div>
             </div>
 
             <DataTable
@@ -458,15 +458,17 @@ const TireManagement: React.FC = () => {
                 sortDirection={sortDirection}
                 onSort={handleSort}
                 tableId="tires-list"
+                filters={filters}
+                onFilterChange={handleFilterChange}
                 actions={[
                     {
-                        icon: <PencilIcon className="h-4 w-4"/>,
+                        icon: <PencilIcon className="h-4 w-4" />,
                         onClick: (g: any) => handleEdit(g.id),
                         className: "p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors",
                         title: "Редактировать"
                     },
                     {
-                        icon: <TrashIcon className="h-4 w-4"/>,
+                        icon: <TrashIcon className="h-4 w-4" />,
                         onClick: (g: any) => handleDeleteRequest(g),
                         className: "p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors",
                         title: "Удалить"
@@ -487,7 +489,7 @@ const TireManagement: React.FC = () => {
                             </div>
                             <div>
                                 <label className="block text-xs font-semibold text-blue-800 dark:text-blue-200 mb-1">Количество</label>
-                                <input type="number" {...register('quantity', {valueAsNumber: true})} min={1} className="w-full text-sm p-1 rounded border-gray-300" />
+                                <input type="number" {...register('quantity', { valueAsNumber: true })} min={1} className="w-full text-sm p-1 rounded border-gray-300" />
                             </div>
                         </div>
                     )}
@@ -519,7 +521,7 @@ const TireManagement: React.FC = () => {
                         </FormField>
                     </div>
 
-                    <CollapsibleSection title="Эксплуатация и Жизненный цикл" isCollapsed={false} onToggle={()=>{}}>
+                    <CollapsibleSection title="Эксплуатация и Жизненный цикл" isCollapsed={false} onToggle={() => { }}>
                         <div className="grid grid-cols-2 gap-4">
                             {watchedStatus === 'Mounted' && (
                                 <>
@@ -533,7 +535,7 @@ const TireManagement: React.FC = () => {
                                         <FormInput type="date" {...register('installDate')} />
                                     </FormField>
                                     <FormField label="Пробег при установке">
-                                        <FormInput type="number" {...register('installOdometer', {valueAsNumber: true})} />
+                                        <FormInput type="number" {...register('installOdometer', { valueAsNumber: true })} />
                                     </FormField>
                                 </>
                             )}
@@ -546,9 +548,9 @@ const TireManagement: React.FC = () => {
                                     </FormSelect>
                                 </FormField>
                             )}
-                            
+
                             <FormField label="Расчетный ресурс (км)">
-                                <FormInput type="number" {...register('estimatedLifespanKm', {valueAsNumber: true})} />
+                                <FormInput type="number" {...register('estimatedLifespanKm', { valueAsNumber: true })} />
                             </FormField>
 
                             {watchedStatus === 'Disposed' && (
@@ -565,17 +567,17 @@ const TireManagement: React.FC = () => {
                     </CollapsibleSection>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <FormField label="Цена покупки"><FormInput type="number" step="0.01" {...register('purchasePrice', {valueAsNumber: true})} /></FormField>
+                        <FormField label="Цена покупки"><FormInput type="number" step="0.01" {...register('purchasePrice', { valueAsNumber: true })} /></FormField>
                         <FormField label="Дата покупки"><FormInput type="date" {...register('purchaseDate')} /></FormField>
-                        <FormField label="Глубина протектора (мм)"><FormInput type="number" step="0.1" {...register('currentDepth', {valueAsNumber: true})} /></FormField>
+                        <FormField label="Глубина протектора (мм)"><FormInput type="number" step="0.1" {...register('currentDepth', { valueAsNumber: true })} /></FormField>
                         <FormField label="Примечание"><FormInput {...register('notes')} /></FormField>
                     </div>
                 </form>
             </Modal>
 
-            <ConfirmationModal 
-                isOpen={isCloseConfirmationOpen} 
-                onClose={() => setIsCloseConfirmationOpen(false)} 
+            <ConfirmationModal
+                isOpen={isCloseConfirmationOpen}
+                onClose={() => setIsCloseConfirmationOpen(false)}
                 onConfirm={handleForceClose}
                 title="Выйти без сохранения?"
                 message="У вас есть несохраненные изменения. Все изменения будут потеряны."
