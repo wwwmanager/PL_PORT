@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from 'url';
 // https://vitejs.dev/config/
 export default defineConfig({
   // Базовый URL для развертывания на GitHub Pages.
-  base: '/PL/',
+  base: '/PL_PORT/',
 
   // --- Плагины ---
   plugins: [
