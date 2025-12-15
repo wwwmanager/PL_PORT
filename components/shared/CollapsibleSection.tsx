@@ -10,7 +10,6 @@ const CollapsibleSection: React.FC<{
 }> = ({ title, isCollapsed, onToggle, children }) => (
   <div className={`bg-white dark:bg-gray-700/50 rounded-lg shadow-sm transition-all duration-300 border border-gray-200 dark:border-gray-600 ${isCollapsed ? 'overflow-hidden' : 'overflow-visible'}`}>
     <button
-      type="button"
       onClick={onToggle}
       className={`w-full flex justify-between items-center p-4 text-left bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 ${isCollapsed ? 'rounded-lg' : 'rounded-t-lg'}`}
       aria-expanded={!isCollapsed}
