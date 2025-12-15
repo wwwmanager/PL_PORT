@@ -208,35 +208,35 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
             id: 'odometerStart', key: 'odometerStart',
             label: <>Одометр<br /><span className="text-[10px] font-normal text-gray-500">начало</span></>,
             sortKey: 'odometerStart',
-            className: 'text-right font-mono text-gray-700 dark:text-gray-300',
+            className: 'text-center font-mono text-gray-700 dark:text-gray-300',
             render: (w) => w.odometerStart
         },
         {
             id: 'odometerEnd', key: 'odometerEnd',
             label: <>Одометр<br /><span className="text-[10px] font-normal text-gray-500">конец</span></>,
             sortKey: 'odometerEnd',
-            className: 'text-right font-mono text-gray-700 dark:text-gray-300',
+            className: 'text-center font-mono text-gray-700 dark:text-gray-300',
             render: (w) => w.odometerEnd || '-'
         },
         {
             id: 'mileage', key: 'mileage',
             label: 'Пробег',
             sortKey: 'mileage',
-            className: 'text-right font-bold text-gray-900 dark:text-white',
+            className: 'text-center font-bold text-gray-900 dark:text-white',
             render: (w) => w.mileage
         },
         {
             id: 'fuelAtStart', key: 'fuelAtStart',
             label: <>Топливо<br /><span className="text-[10px] font-normal text-gray-500">начало</span></>,
             sortKey: 'fuelAtStart',
-            className: 'text-right font-mono',
+            className: 'text-center font-mono',
             render: (w) => <span className={(w.fuelAtStart || 0) < 0 ? 'text-red-600 font-bold' : 'text-gray-700 dark:text-gray-300'}>{(w.fuelAtStart || 0).toFixed(2)}</span>
         },
         {
             id: 'fuelAtEnd', key: 'fuelAtEnd',
             label: <>Топливо<br /><span className="text-[10px] font-normal text-gray-500">конец</span></>,
             sortKey: 'fuelAtEnd',
-            className: 'text-right font-mono',
+            className: 'text-center font-mono',
             render: (w) => <span className={(w.fuelAtEnd || 0) < 0 ? 'text-red-600 font-bold' : 'text-gray-700 dark:text-gray-300'}>{(w.fuelAtEnd || 0).toFixed(2)}</span>
         },
         {
@@ -732,10 +732,10 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                                                 key={col.id}
                                                 id={col.id}
                                                 asTh
-                                                className={`p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors select-none whitespace-nowrap bg-gray-50 dark:bg-gray-800 ${col.className?.includes('text-right') ? 'text-right' : ''}`}
+                                                className={`p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors select-none whitespace-nowrap bg-gray-50 dark:bg-gray-800 ${col.className?.includes('text-center') ? 'text-center' : ''}`}
                                                 onClick={() => col.sortKey && handleSort(col.sortKey as string)}
                                             >
-                                                <div className={`flex items-center gap-1 ${col.className?.includes('text-right') ? 'justify-end' : ''}`}>
+                                                <div className={`flex items-center gap-1 ${col.className?.includes('text-center') ? 'justify-center' : ''}`}>
                                                     {col.label}
                                                     {sortConfig.key === col.sortKey && (
                                                         <span className="text-blue-600 dark:text-blue-400">
