@@ -15,11 +15,11 @@ import { useToast } from '../../hooks/useToast';
 import { DataTable } from '../shared/DataTable';
 
 const FormField: React.FC<{ label: string; children: React.ReactNode; error?: string }> = ({ label, children, error }) => (
-  <div>
-    <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{label}</label>
-    {children}
-    {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-  </div>
+    <div>
+        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{label}</label>
+        {children}
+        {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+    </div>
 );
 
 const FormInput = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
@@ -43,9 +43,9 @@ const storageSchema = z.object({
 type StorageFormData = z.infer<typeof storageSchema>;
 
 // Define explicit type for enriched data to ensure compatibility
-type EnrichedStorage = StorageLocation & { 
-    organizationName: string; 
-    typeName: string; 
+type EnrichedStorage = StorageLocation & {
+    organizationName: string;
+    typeName: string;
 };
 
 const StorageManagement = () => {
@@ -102,15 +102,23 @@ const StorageManagement = () => {
     }, [storages, organizations, showArchived]);
 
     type EnrichedStorageKey = Extract<keyof EnrichedStorage, string>;
-    
-    const columns: { key: EnrichedStorageKey; label: string }[] = [
+
+    const columns: { key: EnrichedStorageKey; label: string; render?: (item: EnrichedStorage) => React.ReactNode }[] = [
         { key: 'name', label: 'Наименование' },
         { key: 'typeName', label: 'Тип' },
         { key: 'organizationName', label: 'Организация' },
         { key: 'address', label: 'Адрес' },
-        { key: 'status', label: 'Статус' },
+        {
+            key: 'status',
+            label: 'Статус',
+            render: (s) => (
+                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${STORAGE_STATUS_COLORS[s.status]}`}>
+                    {STORAGE_STATUS_TRANSLATIONS[s.status]}
+                </span>
+            )
+        },
     ];
-    
+
     const { rows, sortColumn, sortDirection, handleSort, filters, handleFilterChange } = useTable<EnrichedStorage>(enrichedData, columns);
 
     const handleAddNew = () => {
@@ -176,11 +184,11 @@ const StorageManagement = () => {
             closeActionModal();
         }
     };
-    
+
     const modalConfig = useMemo(() => {
         const { type, item } = actionModal;
         if (!type || !item) return { title: '', message: '', confirmText: '', confirmButtonClass: '' };
-        
+
         switch (type) {
             case 'delete': return { title: 'Подтвердить удаление', message: `Удалить место хранения "${item.name}"?`, confirmText: 'Удалить', confirmButtonClass: 'bg-red-600 hover:bg-red-700' };
             case 'archive': return { title: 'Подтвердить архивацию', message: `Архивировать "${item.name}"?`, confirmText: 'Архивировать', confirmButtonClass: 'bg-purple-600 hover:bg-purple-700' };
@@ -188,103 +196,103 @@ const StorageManagement = () => {
             default: return { title: '', message: '', confirmText: '', confirmButtonClass: '' };
         }
     }, [actionModal]);
-    
+
     return (
-      <div className="space-y-4">
-        <ConfirmationModal isOpen={actionModal.isOpen} onClose={closeActionModal} onConfirm={handleConfirmAction} {...modalConfig} />
-        <Modal 
-            isOpen={isModalOpen} 
-            onClose={handleCancel}
-            isDirty={isDirty}
-            title={currentId ? `Редактирование: ${currentName}`: 'Добавить место хранения'}
-            footer={
-                <>
-                    <button onClick={handleCancel} className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500">Отмена</button>
-                    <button onClick={handleSubmit(onSubmit)} className="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700">Сохранить</button>
-                </>
-            }
-        >
-             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField label="Наименование" error={errors.name?.message}><FormInput {...register("name")} /></FormField>
-                    <FormField label="Тип" error={errors.type?.message}>
-                        <FormSelect {...register("type")}>
-                            {Object.entries(STORAGE_TYPE_TRANSLATIONS).map(([key, label]) => 
-                                <option key={key} value={key}>{label}</option>
-                            )}
-                        </FormSelect>
-                    </FormField>
-                    <FormField label="Организация" error={errors.organizationId?.message}>
-                        <FormSelect {...register("organizationId")}>
-                            <option value="">Выберите</option>
-                            {organizations.map(o => <option key={o.id} value={o.id}>{o.shortName}</option>)}
-                        </FormSelect>
-                    </FormField>
-                    <FormField label="Ответственное лицо" error={errors.responsiblePerson?.message}>
-                        <FormSelect {...register("responsiblePerson")}>
-                            <option value="">Выберите</option>
-                            {employees.map(e => <option key={e.id} value={e.fullName}>{e.fullName}</option>)}
-                        </FormSelect>
-                    </FormField>
-                    <div className="md:col-span-2"><FormField label="Адрес" error={errors.address?.message}><FormInput {...register("address")} /></FormField></div>
-                    <div className="md:col-span-2"><FormField label="Описание/примечания" error={errors.description?.message}><FormTextarea {...register("description")} /></FormField></div>
-                </div>
-             </form>
-        </Modal>
-
-        {/* Header Section */}
-        <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Места хранения</h3>
-            <div className="flex items-center gap-4">
-                <label className="flex items-center text-sm text-gray-600 dark:text-gray-300 cursor-pointer select-none">
-                    <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} className="h-4 w-4 rounded border-gray-300 dark:border-gray-500 text-blue-600 focus:ring-blue-500" />
-                    <span className="ml-2">Показать архивные</span>
-                </label>
-                <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-medium py-2 px-4 rounded-lg shadow hover:bg-blue-700 transition-all active:scale-95">
-                    <PlusIcon className="h-5 w-5" /> Добавить
-                </button>
-            </div>
-        </div>
-
-        <DataTable
-            data={rows}
-            columns={columns}
-            sortColumn={sortColumn}
-            sortDirection={sortDirection}
-            onSort={handleSort}
-            filters={filters}
-            onFilterChange={handleFilterChange}
-            tableId="storages-list"
-            actions={[
-                {
-                    icon: <PencilIcon className="h-4 w-4" />,
-                    onClick: (s) => handleEdit(s),
-                    title: "Редактировать",
-                    className: "text-blue-500"
-                },
-                {
-                    icon: <ArchiveBoxIcon className="h-4 w-4" />,
-                    onClick: (s) => openActionModal('archive', s),
-                    title: "Архивировать",
-                    show: (s) => s.status === 'active',
-                    className: "text-purple-500"
-                },
-                {
-                    icon: <ArrowUpTrayIcon className="h-4 w-4" />,
-                    onClick: (s) => openActionModal('unarchive', s),
-                    title: "Восстановить",
-                    show: (s) => s.status !== 'active',
-                    className: "text-green-500"
-                },
-                {
-                    icon: <TrashIcon className="h-4 w-4" />,
-                    onClick: (s) => openActionModal('delete', s),
-                    title: "Удалить",
-                    className: "text-red-500"
+        <div className="space-y-4">
+            <ConfirmationModal isOpen={actionModal.isOpen} onClose={closeActionModal} onConfirm={handleConfirmAction} {...modalConfig} />
+            <Modal
+                isOpen={isModalOpen}
+                onClose={handleCancel}
+                isDirty={isDirty}
+                title={currentId ? `Редактирование: ${currentName}` : 'Добавить место хранения'}
+                footer={
+                    <>
+                        <button onClick={handleCancel} className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500">Отмена</button>
+                        <button onClick={handleSubmit(onSubmit)} className="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700">Сохранить</button>
+                    </>
                 }
-            ]}
-        />
-      </div>
+            >
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField label="Наименование" error={errors.name?.message}><FormInput {...register("name")} /></FormField>
+                        <FormField label="Тип" error={errors.type?.message}>
+                            <FormSelect {...register("type")}>
+                                {Object.entries(STORAGE_TYPE_TRANSLATIONS).map(([key, label]) =>
+                                    <option key={key} value={key}>{label}</option>
+                                )}
+                            </FormSelect>
+                        </FormField>
+                        <FormField label="Организация" error={errors.organizationId?.message}>
+                            <FormSelect {...register("organizationId")}>
+                                <option value="">Выберите</option>
+                                {organizations.map(o => <option key={o.id} value={o.id}>{o.shortName}</option>)}
+                            </FormSelect>
+                        </FormField>
+                        <FormField label="Ответственное лицо" error={errors.responsiblePerson?.message}>
+                            <FormSelect {...register("responsiblePerson")}>
+                                <option value="">Выберите</option>
+                                {employees.map(e => <option key={e.id} value={e.fullName}>{e.fullName}</option>)}
+                            </FormSelect>
+                        </FormField>
+                        <div className="md:col-span-2"><FormField label="Адрес" error={errors.address?.message}><FormInput {...register("address")} /></FormField></div>
+                        <div className="md:col-span-2"><FormField label="Описание/примечания" error={errors.description?.message}><FormTextarea {...register("description")} /></FormField></div>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* Header Section */}
+            <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Места хранения</h3>
+                <div className="flex items-center gap-4">
+                    <label className="flex items-center text-sm text-gray-600 dark:text-gray-300 cursor-pointer select-none">
+                        <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} className="h-4 w-4 rounded border-gray-300 dark:border-gray-500 text-blue-600 focus:ring-blue-500" />
+                        <span className="ml-2">Показать архивные</span>
+                    </label>
+                    <button onClick={handleAddNew} className="flex items-center gap-2 bg-blue-600 text-white font-medium py-2 px-4 rounded-lg shadow hover:bg-blue-700 transition-all active:scale-95">
+                        <PlusIcon className="h-5 w-5" /> Добавить
+                    </button>
+                </div>
+            </div>
+
+            <DataTable
+                data={rows}
+                columns={columns}
+                sortColumn={sortColumn}
+                sortDirection={sortDirection}
+                onSort={handleSort}
+                filters={filters}
+                onFilterChange={handleFilterChange}
+                tableId="storages-list"
+                actions={[
+                    {
+                        icon: <PencilIcon className="h-4 w-4" />,
+                        onClick: (s) => handleEdit(s),
+                        title: "Редактировать",
+                        className: "text-blue-500"
+                    },
+                    {
+                        icon: <ArchiveBoxIcon className="h-4 w-4" />,
+                        onClick: (s) => openActionModal('archive', s),
+                        title: "Архивировать",
+                        show: (s) => s.status === 'active',
+                        className: "text-purple-500"
+                    },
+                    {
+                        icon: <ArrowUpTrayIcon className="h-4 w-4" />,
+                        onClick: (s) => openActionModal('unarchive', s),
+                        title: "Восстановить",
+                        show: (s) => s.status !== 'active',
+                        className: "text-green-500"
+                    },
+                    {
+                        icon: <TrashIcon className="h-4 w-4" />,
+                        onClick: (s) => openActionModal('delete', s),
+                        title: "Удалить",
+                        className: "text-red-500"
+                    }
+                ]}
+            />
+        </div>
     );
 };
 
