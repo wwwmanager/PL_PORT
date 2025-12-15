@@ -44,11 +44,11 @@ const organizationSchema = z.object({
 type OrganizationFormData = z.infer<typeof organizationSchema>;
 
 const FormField: React.FC<{ label: string; children: React.ReactNode; error?: string }> = ({ label, children, error }) => (
-    <div>
-        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{label}</label>
-        {children}
-        {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-    </div>
+  <div>
+    <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">{label}</label>
+    {children}
+    {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+  </div>
 );
 
 const FormInput = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
@@ -64,12 +64,6 @@ const OrganizationManagement: React.FC = () => {
     const [actionModal, setActionModal] = useState<{ isOpen: boolean; type?: 'delete' | 'archive' | 'unarchive'; item?: Organization }>({ isOpen: false });
     const [showArchived, setShowArchived] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
-        main: false,
-        requisites: true,
-        bank: true,
-        license: false,
-    });
     const { showToast } = useToast();
 
     const {
@@ -171,7 +165,7 @@ const OrganizationManagement: React.FC = () => {
     const modalConfig = useMemo(() => {
         const { type, item } = actionModal;
         if (!type || !item) return { title: '', message: '', confirmText: '', confirmButtonClass: '' };
-
+        
         switch (type) {
             case 'delete': return { title: 'Подтвердить удаление', message: `Удалить организацию "${item.shortName}"?`, confirmText: 'Удалить', confirmButtonClass: 'bg-red-600 hover:bg-red-700' };
             case 'archive': return { title: 'Подтвердить архивацию', message: `Архивировать "${item.shortName}"?`, confirmText: 'Архивировать', confirmButtonClass: 'bg-purple-600 hover:bg-purple-700' };
@@ -185,23 +179,19 @@ const OrganizationManagement: React.FC = () => {
     }, [organizations, showArchived]);
 
     const columns: Column<Organization>[] = [
-        {
-            key: 'shortName', label: 'Наименование', sortable: true, render: (o) => (
-                <div className="flex items-center gap-2">
-                    {o.isOwn && <HomeIcon className="h-4 w-4 text-blue-500" title="Своя организация" />}
-                    <span className="font-medium text-gray-900 dark:text-white">{o.shortName}</span>
-                </div>
-            )
-        },
+        { key: 'shortName', label: 'Наименование', sortable: true, render: (o) => (
+            <div className="flex items-center gap-2">
+                {o.isOwn && <HomeIcon className="h-4 w-4 text-blue-500" title="Своя организация" />}
+                <span className="font-medium text-gray-900 dark:text-white">{o.shortName}</span>
+            </div>
+        )},
         { key: 'inn', label: 'ИНН', sortable: true },
         { key: 'address', label: 'Адрес', sortable: true, render: (o) => <span className="truncate max-w-[200px]" title={o.address || ''}>{o.address}</span> },
-        {
-            key: 'status', label: 'Статус', sortable: true, render: (o) => (
-                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${ORGANIZATION_STATUS_COLORS[o.status]}`}>
-                    {ORGANIZATION_STATUS_TRANSLATIONS[o.status]}
-                </span>
-            )
-        }
+        { key: 'status', label: 'Статус', sortable: true, render: (o) => (
+            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${ORGANIZATION_STATUS_COLORS[o.status]}`}>
+                {ORGANIZATION_STATUS_TRANSLATIONS[o.status]}
+            </span>
+        )}
     ];
 
     const { rows, sortColumn, sortDirection, handleSort, filters, handleFilterChange } = useTable(enrichedData, columns);
@@ -209,7 +199,7 @@ const OrganizationManagement: React.FC = () => {
     return (
         <div className="space-y-4">
             <ConfirmationModal isOpen={actionModal.isOpen} onClose={closeActionModal} onConfirm={handleConfirmAction} {...modalConfig} />
-
+            
             <Modal isOpen={isModalOpen} onClose={handleCancel} title={currentOrg?.id ? 'Редактирование' : 'Новая организация'} isDirty={isDirty}
                 footer={
                     <>
@@ -219,7 +209,7 @@ const OrganizationManagement: React.FC = () => {
                 }
             >
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                    <CollapsibleSection title="Основные данные" isCollapsed={collapsedSections.main} onToggle={() => setCollapsedSections(s => ({ ...s, main: !s.main }))}>
+                    <CollapsibleSection title="Основные данные" isCollapsed={false} onToggle={()=>{}}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField label="Краткое наименование" error={errors.shortName?.message}><FormInput {...register("shortName")} /></FormField>
                             <FormField label="Полное наименование" error={errors.fullName?.message}><FormInput {...register("fullName")} /></FormField>
@@ -235,12 +225,12 @@ const OrganizationManagement: React.FC = () => {
                                     <option value="Филиал">Филиал</option>
                                 </FormSelect>
                             </FormField>
-
+                            
                             <div className="flex items-center gap-2 mt-6">
                                 <input type="checkbox" {...register('isOwn')} className="h-4 w-4 text-blue-600 rounded" />
                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Своя организация</span>
                             </div>
-
+                            
                             <FormField label="Головная организация">
                                 <FormSelect {...register("parentOrganizationId")} disabled={isOwnOrg}>
                                     <option value="">Нет</option>
@@ -250,25 +240,25 @@ const OrganizationManagement: React.FC = () => {
                         </div>
                     </CollapsibleSection>
 
-                    <CollapsibleSection title="Реквизиты и контакты" isCollapsed={collapsedSections.requisites} onToggle={() => setCollapsedSections(s => ({ ...s, requisites: !s.requisites }))}>
+                    <CollapsibleSection title="Реквизиты и контакты" isCollapsed={true} onToggle={()=>{}}>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FormField label="ИНН" error={errors.inn?.message}><FormInput {...register("inn")} /></FormField>
                             <FormField label="КПП" error={errors.kpp?.message}><FormInput {...register("kpp")} /></FormField>
                             <FormField label="ОГРН" error={errors.ogrn?.message}><FormInput {...register("ogrn")} /></FormField>
                             <FormField label="ОКТМО" error={errors.oktmo?.message}><FormInput {...register("oktmo")} /></FormField>
-
+                            
                             <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <FormField label="Юр. адрес" error={errors.address?.message}><FormInput {...register("address")} /></FormField>
                                 <FormField label="Почтовый адрес"><FormInput {...register("postalAddress")} /></FormField>
                             </div>
-
+                            
                             <FormField label="Телефон"><FormInput {...register("phone")} /></FormField>
                             <FormField label="Email" error={errors.email?.message}><FormInput {...register("email")} /></FormField>
                             <FormField label="Контактное лицо"><FormInput {...register("contactPerson")} /></FormField>
                         </div>
                     </CollapsibleSection>
 
-                    <CollapsibleSection title="Банковские реквизиты" isCollapsed={collapsedSections.bank} onToggle={() => setCollapsedSections(s => ({ ...s, bank: !s.bank }))}>
+                    <CollapsibleSection title="Банковские реквизиты" isCollapsed={true} onToggle={()=>{}}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField label="Банк"><FormInput {...register("bankName")} /></FormField>
                             <FormField label="БИК" error={errors.bankBik?.message}><FormInput {...register("bankBik")} /></FormField>
@@ -278,14 +268,14 @@ const OrganizationManagement: React.FC = () => {
                     </CollapsibleSection>
 
                     {watchedGroup === 'Мед. учреждение' && (
-                        <CollapsibleSection title="Лицензия (для мед. учреждений)" isCollapsed={collapsedSections.license} onToggle={() => setCollapsedSections(s => ({ ...s, license: !s.license }))}>
+                        <CollapsibleSection title="Лицензия (для мед. учреждений)" isCollapsed={false} onToggle={()=>{}}>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <FormField label="Номер лицензии"><FormInput {...register("medicalLicenseNumber")} /></FormField>
                                 <FormField label="Дата выдачи"><FormInput type="date" {...register("medicalLicenseIssueDate")} /></FormField>
                             </div>
                         </CollapsibleSection>
                     )}
-
+                    
                     <FormField label="Примечание"><FormTextarea {...register("notes")} /></FormField>
                 </form>
             </Modal>

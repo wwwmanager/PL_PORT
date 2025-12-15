@@ -17,12 +17,12 @@ interface DictionariesProps {
 
 const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
     const { can } = useAuth();
-
+    
     const allDicts: { type: DictionaryType; label: string; }[] = [
+        { type: 'vehicles', label: 'Транспорт' },
+        { type: 'employees', label: 'Сотрудники' },
         { type: 'organizations', label: 'Организации' },
         { type: 'fuelTypes', label: 'Топливо' },
-        { type: 'employees', label: 'Сотрудники' },
-        { type: 'vehicles', label: 'Транспорт' },
         { type: 'storageLocations', label: 'Склады' },
         { type: 'routes', label: 'Маршруты' },
         { type: 'calendar', label: 'Календарь' },
@@ -48,9 +48,9 @@ const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
             document.removeEventListener('navigateTo', handleNavigate as EventListener);
         };
     }, [subViewToOpen]);
-
+    
     const renderActiveDictionary = () => {
-        switch (activeDictionary) {
+        switch(activeDictionary) {
             case 'fuelTypes': return <FuelTypeManagement />;
             case 'organizations': return <OrganizationManagement />;
             case 'vehicles': return <VehicleList />;
@@ -68,13 +68,14 @@ const Dictionaries: React.FC<DictionariesProps> = ({ subViewToOpen }) => {
             <div className="border-b border-gray-200 dark:border-gray-700 px-2 overflow-x-auto">
                 <div className="flex space-x-1">
                     {allDicts.map(dict => (
-                        <button
+                        <button 
                             key={dict.type}
-                            onClick={() => setActiveDictionary(dict.type)}
-                            className={`px-5 py-4 text-sm font-medium transition-colors border-b-2 whitespace-nowrap focus:outline-none ${activeDictionary === dict.type
-                                    ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600'
-                                }`}
+                            onClick={() => setActiveDictionary(dict.type)} 
+                            className={`px-5 py-4 text-sm font-medium transition-colors border-b-2 whitespace-nowrap focus:outline-none ${
+                                activeDictionary === dict.type 
+                                ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400' 
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:border-gray-600'
+                            }`}
                         >
                             {dict.label}
                         </button>
