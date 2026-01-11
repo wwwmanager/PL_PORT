@@ -48,8 +48,37 @@ type EditorPrefs = {
     gridSize?: number;
     pageOffsets?: StoredPageOffsets;
     hiddenFields?: string[];
-    fieldPages?: Record<string, PageKey>; // New: Store which page a field belongs to
+    fieldPages?: Record<string, PageKey>;
 };
+
+// --- STAGE KEYS DEFINITION ---
+const STAGE_1_KEYS = new Set([
+    'waybillDay', 'waybillMonth', 'waybillYear',
+    'validFromDay', 'validFromMonth', 'validFromYear',
+    'validToDay', 'validToMonth', 'validToYear',
+    'vehicleBrand', 'vehiclePlate',
+    'driverFullName', 'driverPersonnelNumber',
+    'driverLicenseNumber', 'driverLicenseCategory', 'driverSnils',
+    'orgMedicalLicense',
+    'driverShortName1',
+    'departureAllowed',
+    'fuelTypeName',
+    'driverPosition1',
+    'driverShortName2'
+]);
+
+const STAGE_2_KEYS = new Set([
+    'departureDate', 'departureTime',
+    'odometerStart',
+    'fuelFilled',
+    'fuelAtStart', 'fuelAtEnd',
+    'fuelPlanned', 'fuelActual',
+    'arrivalDate', 'arrivalTime',
+    'odometerEnd',
+    'totalDistance',
+    'calculatorPosition',
+    'calculatorShortName'
+]);
 
 // Default positions for STANDARD fields only.
 const INITIAL_FIELD_POSITIONS = {
@@ -295,6 +324,10 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
     const [selectedIds, setSelectedIds] = useState<FieldKey[]>([]);
     const [hiddenFields, setHiddenFields] = useState<Set<string>>(new Set(DEFAULT_HIDDEN_FIELDS));
     const [isFieldSettingsOpen, setIsFieldSettingsOpen] = useState(false);
+
+    // Print Stages
+    const [printStage1, setPrintStage1] = useState(false);
+    const [printStage2, setPrintStage2] = useState(false);
 
     // States for Selection and Resizing
     const [selectionBox, setSelectionBox] = useState<{ startX: number, startY: number, currentX: number, currentY: number } | null>(null);
@@ -664,9 +697,6 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
                 return prev.includes(id) ? prev : [id];
             });
 
-            // We need to know which page we started dragging from to handle cross-page drag visual
-            // For now, dragging is visual via CSS 'left/top'. Cross-page logic happens on MouseUp.
-
             dragInfo.current = {
                 type: 'drag',
                 startPoint: { x: e.clientX, y: e.clientY },
@@ -765,10 +795,6 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
                         const newW = Math.max(20, startW + deltaX);
 
                         const startH = initialHeights[id];
-                        // If height was previously auto/undefined, treat it as roughly 15px for calculation base
-                        // or just add delta to a base value.
-                        // Better approach: If startH is undefined, capture rendered height? 
-                        // For simplicity, treat undefined as 15px (approx font size height).
                         const baseH = startH || 15;
                         const newH = Math.max(10, baseH + deltaY);
 
@@ -794,11 +820,6 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
 
             // Handle Drag Snapping & Cross-Page Move
             if (wasDrag) {
-                // Check for cross-page drop
-                // We need to check if we are over a DIFFERENT page than where items currently are.
-                // Items might be on different pages, but let's assume selection moves together.
-                // We check the page under the mouse cursor.
-
                 const elementsUnder = document.elementsFromPoint(e.clientX, e.clientY);
                 let targetPage: PageKey | null = null;
 
@@ -812,11 +833,9 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
                     const targetRect = targetPageEl?.getBoundingClientRect();
 
                     if (targetRect) {
-                        // Update field pages and coordinates
                         selectedIds.forEach(fieldId => {
                             const currentPage = fieldPages[fieldId];
 
-                            // Apply Grid Snapping first (visual cleanup)
                             if (showGrid && gridSize > 0) {
                                 const p = newPositions[fieldId];
                                 if (p) {
@@ -824,17 +843,9 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
                                 }
                             }
 
-                            // If changing pages
                             if (targetPage !== currentPage) {
                                 const currentPos = newPositions[fieldId];
                                 if (currentPos) {
-                                    // We need to calculate position relative to NEW page.
-                                    // Visual pos was updated via MouseMove relative to OLD page origin + delta.
-                                    // But technically React hasn't re-rendered with new parent yet.
-                                    // So `currentPos` is relative to OLD parent.
-                                    // Absolute Screen Pos = OldParentRect.left + currentPos.x
-                                    // New Local Pos = Absolute Screen Pos - NewParentRect.left
-
                                     const oldPageEl = document.getElementById(`print-page-canvas-${currentPage}`);
                                     const oldRect = oldPageEl?.getBoundingClientRect();
 
@@ -848,7 +859,6 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
                                         newPositions[fieldId] = { ...currentPos, x: newX, y: newY };
                                         newFieldPages[fieldId] = targetPage as PageKey;
 
-                                        // Re-snap to grid on new page
                                         if (showGrid && gridSize > 0) {
                                             newPositions[fieldId].x = Math.round(newPositions[fieldId].x / gridSize) * gridSize;
                                             newPositions[fieldId].y = Math.round(newPositions[fieldId].y / gridSize) * gridSize;
@@ -859,8 +869,6 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
                         });
                     }
                 } else {
-                    // Drop outside any page? Revert? Or just snap to current page boundaries?
-                    // Just snap to grid on current page
                     if (showGrid && gridSize > 0) {
                         selectedIds.forEach(id => {
                             const p = newPositions[id];
@@ -872,11 +880,9 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
                 }
             }
 
-            // Update State
             setPositions(newPositions);
             setFieldPages(newFieldPages);
 
-            // Record History if changed
             if (historySnapshot.current) {
                 const hasChanged = JSON.stringify(newPositions) !== JSON.stringify(historySnapshot.current.positions) ||
                     JSON.stringify(newFieldPages) !== JSON.stringify(historySnapshot.current.fieldPages);
@@ -1024,10 +1030,7 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
     const pageKeysToRender = useMemo(() => {
         const keys: PageKey[] = ['page1'];
         // Logic to detect if page 2 is needed
-        // Check if any fields are assigned to page2
         const hasFieldsOnPage2 = Object.values(fieldPages).some(p => p === 'page2');
-
-        // Also keep old logic for backward compat if data not migrated (though we default map)
         const meaningfulPage2Fields = pageFieldList.page2.filter((fieldId) => {
             const value = renderValue(fieldId);
             if (value === undefined || value === null) return false;
@@ -1232,6 +1235,28 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
                                 Всегда 2-я стр.
                             </label>
 
+                            {/* Print Stages Checkboxes */}
+                            <div className="flex items-center gap-3 border-l pl-3 ml-1 border-gray-300 dark:border-gray-600">
+                                <label className="inline-flex items-center gap-2" title="Начальные данные (Водитель, ТС, Даты)">
+                                    <input
+                                        type="checkbox"
+                                        checked={printStage1}
+                                        onChange={(e) => setPrintStage1(e.target.checked)}
+                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    1 Этап
+                                </label>
+                                <label className="inline-flex items-center gap-2" title="Конечные данные (Пробег, Топливо, Итоги)">
+                                    <input
+                                        type="checkbox"
+                                        checked={printStage2}
+                                        onChange={(e) => setPrintStage2(e.target.checked)}
+                                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    2 Этап
+                                </label>
+                            </div>
+
                             <button
                                 type="button"
                                 onClick={() => window.print()}
@@ -1322,6 +1347,16 @@ const PrintableWaybill: FC<PrintableWaybillProps> = ({
 
                                         {pageFieldList[pageKey].map((id) => {
                                             if (hiddenFields.has(id)) return null;
+
+                                            // STAGE FILTERING LOGIC
+                                            const hasStageSelection = printStage1 || printStage2;
+                                            if (hasStageSelection) {
+                                                const isS1 = STAGE_1_KEYS.has(id);
+                                                const isS2 = STAGE_2_KEYS.has(id);
+                                                
+                                                if (isS1 && !printStage1) return null;
+                                                if (isS2 && !printStage2) return null;
+                                            }
 
                                             return (
                                                 <DraggableField
