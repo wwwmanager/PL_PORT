@@ -23,6 +23,13 @@ export enum VehicleStatus {
   MAINTENANCE = 'Maintenance'
 }
 
+export type DriverLicenseCategory =
+  // Обычные права
+  | 'M' | 'A' | 'A1' | 'B' | 'B1' | 'C' | 'C1' | 'D' | 'D1'
+  | 'BE' | 'CE' | 'C1E' | 'DE' | 'D1E' | 'Tm' | 'Tb'
+  // УТМ (самоходная техника)
+  | 'AI' | 'AII' | 'A3' | 'A4' | 'E' | 'F';
+
 export type StockTransactionType = 'income' | 'expense';
 export type StockExpenseReason = 'waybill' | 'maintenance' | 'writeOff' | 'fuelCardTopUp' | 'inventoryAdjustment' | 'other';
 export type StorageType = 'centralWarehouse' | 'remoteWarehouse' | 'vehicleTank' | 'contractorWarehouse';
@@ -93,7 +100,10 @@ export interface Vehicle {
   id: string;
   plateNumber: string;
   brand: string;
-  vin?: string;
+  vin?: string | null;
+  vehicleCategory?: DriverLicenseCategory | null;
+  bodyNumber?: string | null;
+  chassisNumber?: string | null;
   mileage: number;
   currentFuel?: number;
   fuelTypeId?: string;
@@ -374,32 +384,32 @@ export interface KpiData {
 }
 
 export interface SeasonSettings {
-    type: 'recurring' | 'manual';
-    summerDay?: number;
-    summerMonth?: number;
-    winterDay?: number;
-    winterMonth?: number;
-    winterStartDate?: string;
-    winterEndDate?: string;
+  type: 'recurring' | 'manual';
+  summerDay?: number;
+  summerMonth?: number;
+  winterDay?: number;
+  winterMonth?: number;
+  winterStartDate?: string;
+  winterEndDate?: string;
 }
 
 export interface StorageLocation {
-    id: string;
-    name: string;
-    type: StorageType;
-    organizationId: string;
-    address?: string | null;
-    responsiblePerson?: string | null;
-    description?: string | null;
-    status: 'active' | 'archived';
+  id: string;
+  name: string;
+  type: StorageType;
+  organizationId: string;
+  address?: string | null;
+  responsiblePerson?: string | null;
+  description?: string | null;
+  status: 'active' | 'archived';
 }
 
 export const EMPLOYEE_TYPE_TRANSLATIONS: Record<EmployeeType, string> = {
-    driver: 'Водитель',
-    dispatcher: 'Диспетчер',
-    mechanic: 'Механик',
-    controller: 'Контролер',
-    accountant: 'Бухгалтер',
-    manager: 'Менеджер',
-    other: 'Другое'
+  driver: 'Водитель',
+  dispatcher: 'Диспетчер',
+  mechanic: 'Механик',
+  controller: 'Контролер',
+  accountant: 'Бухгалтер',
+  manager: 'Менеджер',
+  other: 'Другое'
 };

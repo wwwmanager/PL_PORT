@@ -1,4 +1,6 @@
 // A simple, self-contained faker utility to avoid large dependencies.
+import { validateVin, validatePlateNumber } from '../shared/validation/vehicle';
+
 const randomElement = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
 const FIRST_NAMES = ['Иван', 'Петр', 'Сергей', 'Александр', 'Дмитрий', 'Андрей', 'Алексей', 'Максим', 'Владимир', 'Евгений', 'Анна', 'Мария', 'Елена', 'Ольга', 'Наталья'];
@@ -38,7 +40,7 @@ export const faker = {
     },
     location: {
         city: (): string => randomElement(CITIES),
-        streetAddress: (includeStreet?: boolean): string => `${includeStreet ? randomElement(STREETS) + ', ' : ''}д. ${faker.number.int({min: 1, max: 150})}`
+        streetAddress: (includeStreet?: boolean): string => `${includeStreet ? randomElement(STREETS) + ', ' : ''}д. ${faker.number.int({ min: 1, max: 150 })}`
     },
     vehicle: {
         manufacturer: (): string => randomElement(VEHICLE_MAKES),
@@ -56,7 +58,7 @@ export const faker = {
     },
     helpers: {
         arrayElement: <T>(arr: T[]): T => randomElement(arr),
-        weightedArrayElement: <T>(arr: {weight: number, value: T}[]): T => {
+        weightedArrayElement: <T>(arr: { weight: number, value: T }[]): T => {
             const totalWeight = arr.reduce((sum, item) => sum + item.weight, 0);
             let random = Math.random() * totalWeight;
             for (const item of arr) {
@@ -67,7 +69,7 @@ export const faker = {
         }
     },
     phone: {
-      number: (): string => `+7 (9${faker.string.numeric(2)}) ${faker.string.numeric(3)}-${faker.string.numeric(2)}-${faker.string.numeric(2)}`
+        number: (): string => `+7 (9${faker.string.numeric(2)}) ${faker.string.numeric(3)}-${faker.string.numeric(2)}-${faker.string.numeric(2)}`
     }
 };
 
@@ -92,19 +94,9 @@ export const validation = {
         }
         return "";
     },
-    vin: (vin: string): string => {
-        if (vin && vin.length !== 17) {
-            return "VIN должен состоять из 17 символов";
-        }
-        return "";
-    },
-    plateNumber: (plate: string): string => {
-        if (!plate) return "Номерной знак обязателен";
-        if (!/^[АВЕКМНОРСТУХ]\d{3}[АВЕКМНОРСТУХ]{2}\d{2,3}$/i.test(plate.replace(/\s/g, ''))) {
-            return "Неверный формат (Пример: А123ВС45)";
-        }
-        return "";
-    },
+    // Use shared validation for vehicle identifiers
+    vin: (vin: string): string | null => validateVin(vin) || "",
+    plateNumber: (plate: string): string | null => validatePlateNumber(plate) || "",
     pts: (series: string, number: string): string => {
         if (!series && !number) return "";
         if (!/^\d{2}[АВЕКМНОРСТУХ]{2}$/i.test(series.replace(/\s/g, ''))) return "Серия ПТС: 2 цифры, 2 буквы (АВЕКМНОРСТУХ)";

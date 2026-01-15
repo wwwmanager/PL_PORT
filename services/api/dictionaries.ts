@@ -3,6 +3,7 @@ import { Organization, FuelType, SavedRoute, StorageLocation } from '../../types
 import { createRepo, ListQuery } from '../repo';
 import { DB_KEYS } from '../dbKeys';
 import { getAppSettings, saveAppSettings } from './settings';
+import { generateNextNumber } from '../sequenceService';
 
 const orgRepo = createRepo<Organization>(DB_KEYS.ORGANIZATIONS);
 const fuelTypeRepo = createRepo<FuelType>(DB_KEYS.FUEL_TYPES);
@@ -17,7 +18,12 @@ export const deleteOrganization = (id: string) => orgRepo.remove(id);
 
 // --- Fuel Types ---
 export const getFuelTypes = async () => (await fuelTypeRepo.list({ pageSize: 1000 })).data;
-export const addFuelType = (item: Omit<FuelType, 'id'>) => fuelTypeRepo.create(item);
+export const addFuelType = async (item: Omit<FuelType, 'id'>) => {
+    if (!item.code || item.code.trim() === '') {
+        item.code = await generateNextNumber('fuelType');
+    }
+    return fuelTypeRepo.create(item);
+};
 export const updateFuelType = (item: FuelType) => fuelTypeRepo.update(item.id, item);
 export const deleteFuelType = (id: string) => fuelTypeRepo.remove(id);
 
@@ -87,7 +93,7 @@ export const addSavedRoutesFromWaybill = async (routes: any[]) => {
 
     // 2. Load existing to check for duplicates and LIMIT
     const existing = (await savedRouteRepo.list({ pageSize: 10000 })).data;
-    
+
     // SAFETY CHECK: If limit reached, disable auto-save and stop
     if (existing.length >= 50) {
         console.warn('Route dictionary limit (50) reached. Auto-save disabled.');
@@ -98,25 +104,25 @@ export const addSavedRoutesFromWaybill = async (routes: any[]) => {
     // Используем жесткую нормализацию для ключа быстрой проверки
     const existingSet = new Set(existing.map(r => `${normalizeRouteString(r.from)}|${normalizeRouteString(r.to)}`));
 
-    for(const r of routes) {
-        if(r.from && r.to && r.distanceKm) {
+    for (const r of routes) {
+        if (r.from && r.to && r.distanceKm) {
             const normalizedFrom = normalizeRouteString(r.from);
             const normalizedTo = normalizeRouteString(r.to);
-            
+
             // Если после нормализации строка стала пустой (например, маршрут "1 -> 2"), используем оригинал (в нижнем регистре без пробелов) как фоллбэк
             const keyFrom = normalizedFrom || r.from.toLowerCase().replace(/\s/g, '');
             const keyTo = normalizedTo || r.to.toLowerCase().replace(/\s/g, '');
-            
+
             const key = `${keyFrom}|${keyTo}`;
-            
+
             if (!existingSet.has(key)) {
                 await savedRouteRepo.create({ from: r.from.trim(), to: r.to.trim(), distanceKm: r.distanceKm });
                 existingSet.add(key); // Prevent adding duplicates within the same batch
-                
+
                 // Break if we hit the limit during this loop
                 if (existing.length + existingSet.size >= 50) {
-                     await saveAppSettings({ ...settings, autoSaveRoutes: false });
-                     break;
+                    await saveAppSettings({ ...settings, autoSaveRoutes: false });
+                    break;
                 }
             }
         }
@@ -124,7 +130,7 @@ export const addSavedRoutesFromWaybill = async (routes: any[]) => {
 };
 
 // --- Storages ---
-export type MockStorage = StorageLocation; 
+export type MockStorage = StorageLocation;
 export const fetchStorages = async (q: ListQuery = {}) => storageRepo.list(q);
 export const addStorage = (item: Omit<StorageLocation, 'id'>) => storageRepo.create(item);
 export const updateStorage = (item: StorageLocation) => storageRepo.update(item.id, item);

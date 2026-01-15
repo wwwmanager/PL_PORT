@@ -67,7 +67,27 @@ subscribe((msg) => {
   }
 });
 
-export function createRepo<T extends { id: string }>(entityKey: string, version = 1) {
+/**
+ * Repository options for customizing behavior
+ */
+export interface RepoOptions<T> {
+  /**
+   * Migration function called when reading existing data
+   * Returns the migrated item and a flag indicating if changes were made
+   */
+  migrate?: (item: any) => { item: T; changed: boolean };
+
+  /**
+   * Normalization function called before writing (create/update)
+   * Returns the normalized item
+   */
+  normalizeOnWrite?: (item: T) => T;
+}
+
+export function createRepo<T extends { id: string }>(
+  entityKey: string,
+  options?: RepoOptions<T>
+) {
   // Создаем изолированное хранилище ("таблицу") для этой сущности
   const store = localforage.createInstance({
     name: 'AppDB',        // Имя базы данных IndexedDB
@@ -115,6 +135,28 @@ export function createRepo<T extends { id: string }>(entityKey: string, version 
       await store.iterate((value: T) => {
         items.push(value);
       });
+
+      // Apply migration if configured
+      if (options?.migrate) {
+        const changed: T[] = [];
+        const migrated = items.map(item => {
+          const result = options.migrate!(item);
+          if (result.changed) {
+            changed.push(result.item);
+          }
+          return result.item;
+        });
+
+        // Bulk update changed items back to storage
+        if (changed.length > 0) {
+          console.log(`[Repo] Migrating ${changed.length} items in ${entityKey}`);
+          await Promise.all(changed.map(item => store.setItem(item.id, item)));
+        }
+
+        memoryCache.set(entityKey, migrated);
+        loadingPromises.delete(entityKey);
+        return migrated;
+      }
 
       memoryCache.set(entityKey, items);
       loadingPromises.delete(entityKey);
@@ -187,7 +229,12 @@ export function createRepo<T extends { id: string }>(entityKey: string, version 
 
   async function create(item: Omit<T, 'id'> & Partial<Pick<T, 'id'>>): Promise<T> {
     const id = item.id ?? safeUUID();
-    const obj = { ...clone(item), id } as T;
+    let obj = { ...clone(item), id } as T;
+
+    // Apply normalization if configured
+    if (options?.normalizeOnWrite) {
+      obj = options.normalizeOnWrite(obj);
+    }
 
     // 1. Write to DB (Atomic)
     await store.setItem(id, obj);
@@ -208,7 +255,12 @@ export function createRepo<T extends { id: string }>(entityKey: string, version 
       if (!existing) throw new Error(`Not found: ${entityKey}#${id}`);
     }
 
-    const merged = { ...existing, ...clone(patch) } as T;
+    let merged = { ...existing, ...clone(patch) } as T;
+
+    // Apply normalization if configured
+    if (options?.normalizeOnWrite) {
+      merged = options.normalizeOnWrite(merged);
+    }
 
     await store.setItem(id, merged);
 

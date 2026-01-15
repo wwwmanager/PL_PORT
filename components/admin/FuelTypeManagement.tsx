@@ -105,8 +105,8 @@ const FuelTypeManagement = () => {
     const name = currentItem.name?.trim() ?? '';
     const code = currentItem.code?.trim() ?? '';
 
-    if (!name || !code) {
-      showToast('Пожалуйста, заполните все поля.', 'error');
+    if (!name) {
+      showToast('Пожалуйста, заполните название.', 'error');
       return;
     }
 
@@ -119,11 +119,14 @@ const FuelTypeManagement = () => {
       return;
     }
 
-    const codeLower = code.toLowerCase();
-    const duplicate = fuelTypes.some(ft => ft.code.toLowerCase() === codeLower && ft.id !== (currentItem as any).id);
-    if (duplicate) {
-      showToast('Код должен быть уникальным.', 'error');
-      return;
+    // Проверка уникальности кода только если он заполнен
+    if (code) {
+      const codeLower = code.toLowerCase();
+      const duplicate = fuelTypes.some(ft => ft.code.toLowerCase() === codeLower && ft.id !== (currentItem as any).id);
+      if (duplicate) {
+        showToast('Код должен быть уникальным.', 'error');
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -196,8 +199,13 @@ const FuelTypeManagement = () => {
             <FormField label="Название">
               <FormInput name="name" value={currentItem.name ?? ''} onChange={handleFormChange} />
             </FormField>
-            <FormField label="Код">
-              <FormInput name="code" value={currentItem.code ?? ''} onChange={handleFormChange} />
+            <FormField label="Код (необязательно)">
+              <FormInput
+                name="code"
+                value={currentItem.code ?? ''}
+                onChange={handleFormChange}
+                placeholder="Будет сгенерирован автоматически (FUEL-001...)"
+              />
             </FormField>
             <FormField label="Плотность">
               <FormInput
@@ -236,18 +244,18 @@ const FuelTypeManagement = () => {
         tableId="fuel-types-list"
         isLoading={isLoading}
         actions={[
-            {
-                icon: <PencilIcon className="h-4 w-4" />,
-                onClick: (ft) => handleEdit(ft),
-                title: "Редактировать",
-                className: "text-gray-500 hover:text-blue-600"
-            },
-            {
-                icon: <TrashIcon className="h-4 w-4" />,
-                onClick: (ft) => handleRequestDelete(ft),
-                title: "Удалить",
-                className: "text-gray-500 hover:text-red-600"
-            }
+          {
+            icon: <PencilIcon className="h-4 w-4" />,
+            onClick: (ft) => handleEdit(ft),
+            title: "Редактировать",
+            className: "text-gray-500 hover:text-blue-600"
+          },
+          {
+            icon: <TrashIcon className="h-4 w-4" />,
+            onClick: (ft) => handleRequestDelete(ft),
+            title: "Удалить",
+            className: "text-gray-500 hover:text-red-600"
+          }
         ]}
       />
     </div>

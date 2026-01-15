@@ -850,6 +850,7 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
                     title={selectedWaybill ? `ПЛ №${selectedWaybill.number}` : "Новый путевой лист"}
                     isDraggable={true}
                     isResizable={true}
+                    maxWidth="md:max-w-[1400px]"
                 >
                     <WaybillDetail
                         waybill={selectedWaybill}

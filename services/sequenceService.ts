@@ -2,7 +2,7 @@
 import { loadJSON, saveJSON } from './storage';
 import { DB_KEYS } from './dbKeys';
 
-type EntityType = 'waybill' | 'income' | 'expense' | 'fuelCard' | 'employee' | 'item' | 'vehicle';
+type EntityType = 'waybill' | 'income' | 'expense' | 'fuelCard' | 'employee' | 'item' | 'vehicle' | 'fuelType';
 
 interface SequenceConfig {
     prefix: string;
@@ -18,6 +18,7 @@ const CONFIG: Record<EntityType, SequenceConfig> = {
     employee: { prefix: 'EMP', digits: 4, resetStrategy: 'none' },
     vehicle: { prefix: 'VEH', digits: 4, resetStrategy: 'none' },
     item: { prefix: 'ITM', digits: 5, resetStrategy: 'none' },
+    fuelType: { prefix: 'FUEL', digits: 3, resetStrategy: 'none' },
 };
 
 /**
@@ -30,7 +31,7 @@ const CONFIG: Record<EntityType, SequenceConfig> = {
 export const generateNextNumber = async (type: EntityType, dateStr?: string): Promise<string> => {
     const config = CONFIG[type];
     const counters = await loadJSON<Record<string, number>>(DB_KEYS.COUNTERS, {});
-    
+
     let counterKey: string = type;
     let timePrefix = '';
 
@@ -51,14 +52,14 @@ export const generateNextNumber = async (type: EntityType, dateStr?: string): Pr
 
     // Get next index
     const nextIndex = (counters[counterKey] || 0) + 1;
-    
+
     // Save updated counter
     counters[counterKey] = nextIndex;
     await saveJSON(DB_KEYS.COUNTERS, counters);
 
     // Format final string
     const numberPart = String(nextIndex).padStart(config.digits, '0');
-    
+
     // Result: PREFIX[-YYYYMM]-XXXXXX
     // Example: WL-202405-000001 or EMP-0042
     if (config.resetStrategy === 'none') {

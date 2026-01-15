@@ -1,11 +1,9 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Vehicle, FuelType, Employee, VehicleStatus, Organization } from '../../types';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
+import { useForm, useController, Control } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { addVehicle, updateVehicle, deleteVehicle, recalculateVehicleStats } from '../../services/mockApi';
 import { useVehicles, useFuelTypes, useEmployees, useOrganizations } from '../../hooks/queries';
-import { validation } from '../../services/faker';
 import { PencilIcon, TrashIcon, PlusIcon, ArchiveBoxIcon, ArrowUpTrayIcon, ArrowUturnLeftIcon } from '../Icons';
 import useTable from '../../hooks/useTable';
 import Modal from '../shared/Modal';
@@ -14,69 +12,21 @@ import { useToast } from '../../hooks/useToast';
 import CollapsibleSection from '../shared/CollapsibleSection';
 import { VEHICLE_STATUS_COLORS, VEHICLE_STATUS_TRANSLATIONS } from '../../constants';
 import { DataTable, Column } from '../shared/DataTable';
-
-// --- Zod Schema for Validation ---
-const fuelConsumptionRatesSchema = z.object({
-    summerRate: z.number().positive('Норма должна быть > 0'),
-    winterRate: z.number().positive('Норма должна быть > 0'),
-    cityIncreasePercent: z.number().min(0, "Надбавка не может быть отрицательной").nullish(),
-    warmingIncreasePercent: z.number().min(0, "Надбавка не может быть отрицательной").nullish(),
-});
-
-const maintenanceRecordSchema = z.object({
-    id: z.string().optional(),
-    date: z.string().min(1, "Дата обязательна"),
-    workType: z.string().min(1, "Тип работ обязателен"),
-    mileage: z.number().min(0),
-    description: z.string().optional().nullable(),
-    performer: z.string().optional().nullable(),
-    cost: z.number().optional().nullable(),
-});
-
-const vehicleSchema = z.object({
-    id: z.string().optional(),
-    plateNumber: z.string().min(1, "Гос. номер обязателен").superRefine((val, ctx) => {
-        const error = validation.plateNumber(val);
-        if (error) ctx.addIssue({ code: z.ZodIssueCode.custom, message: error });
-    }),
-    brand: z.string().min(1, "Марка/модель обязательна"),
-    vin: z.string().min(1, "VIN обязателен").superRefine((val, ctx) => {
-        const error = validation.vin(val);
-        if (error) ctx.addIssue({ code: z.ZodIssueCode.custom, message: error });
-    }),
-    mileage: z.number().min(0, "Пробег не может быть отрицательным"),
-    fuelTypeId: z.string().min(1, "Тип топлива обязателен"),
-    fuelConsumptionRates: fuelConsumptionRatesSchema,
-    assignedDriverId: z.string().nullable(),
-    organizationId: z.string().optional().nullable(),
-    currentFuel: z.number().min(0).optional().nullable(),
-    year: z.number().optional().nullable(),
-    vehicleType: z.enum(['Легковой', 'Тягач', 'Прицеп', 'Автобус', 'Спецтехника']).optional().nullable(),
-    status: z.nativeEnum(VehicleStatus),
-    notes: z.string().optional().nullable(),
-    ptsType: z.enum(['PTS', 'EPTS']).optional().nullable(),
-    ptsSeries: z.string().optional().nullable(),
-    ptsNumber: z.string().optional().nullable(),
-    eptsNumber: z.string().optional().nullable(),
-    diagnosticCardNumber: z.string().optional().nullable(),
-    diagnosticCardIssueDate: z.string().optional().nullable(),
-    diagnosticCardExpiryDate: z.string().optional().nullable(),
-    maintenanceHistory: z.array(maintenanceRecordSchema).optional().nullable(),
-    useCityModifier: z.boolean().optional(),
-    useWarmingModifier: z.boolean().optional(),
-    fuelTankCapacity: z.number().min(0).optional().nullable(),
-    disableFuelCapacityCheck: z.boolean().optional(),
-    osagoSeries: z.string().optional().nullable(),
-    osagoNumber: z.string().optional().nullable(),
-    osagoStartDate: z.string().optional().nullable(),
-    osagoEndDate: z.string().optional().nullable(),
-    storageLocationId: z.string().optional().nullable(),
-    // Maintenance
-    maintenanceIntervalKm: z.number().min(0).optional().nullable(),
-    lastMaintenanceMileage: z.number().min(0).optional().nullable(),
-});
-
-type VehicleFormData = z.infer<typeof vehicleSchema>;
+import { vehicleSchema, VehicleFormData } from './vehicleSchema';
+import { getVehicleWarnings } from '../../shared/validation/vehicle';
+import {
+    normalizePlateInput,
+    normalizeVinInput,
+    normalizeBodyInput,
+    normalizeChassisInput,
+    validatePlateSoft,
+    validateVinSoft,
+    validateBodySoft,
+    validateChassisSoft,
+    NormalizeResult
+} from '../../shared/vehicleInput';
+import { createNotify } from '../../shared/notify';
+import { getAllowedCategories, CATEGORY_LABELS, UTM_CATEGORY_LABELS } from '../../shared/vehicleCategoryMap';
 
 // --- Form Components ---
 const FormField: React.FC<{ label: string; children: React.ReactNode, error?: string }> = ({ label, children, error }) => (
@@ -96,6 +46,61 @@ const FormCheckbox = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
     <input type="checkbox" {...props} className="h-4 w-4 rounded border-gray-300 dark:border-gray-500 text-blue-600 focus:ring-blue-500" />
 );
 
+// --- Controlled Input with Soft Validation ---
+interface ControlledHeaderProps {
+    name: any;
+    label: string;
+    control: Control<any>;
+    normalize: (val: string) => NormalizeResult;
+    validate: (val: string) => { isValid: boolean; error?: string };
+    placeholder?: string;
+}
+
+const ControlledIdentifierInput: React.FC<ControlledHeaderProps> = ({ name, label, control, normalize, validate, placeholder }) => {
+    const { field, fieldState: { error } } = useController({ name, control });
+    const [warning, setWarning] = useState<string | null>(null);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const raw = e.target.value;
+        const { value: normalized, wasConverted } = normalize(raw);
+
+        // Update form value
+        field.onChange(normalized);
+
+        // Run soft validation
+        const res = validate(normalized);
+        setWarning(res.isValid ? null : (res.error || null));
+    };
+
+    // Also validate on mount/update if value exists (for edit mode)
+    useEffect(() => {
+        if (field.value) {
+            const res = validate(field.value);
+            setWarning(res.isValid ? null : (res.error || null));
+        }
+    }, [field.value]); // Simplified dep
+
+    return (
+        <FormField label={label} error={error?.message}>
+            <div className="relative">
+                <input
+                    value={field.value || ''}
+                    onChange={handleChange}
+                    onBlur={field.onBlur}
+                    placeholder={placeholder}
+                    className={`w-full bg-white dark:bg-gray-600 border rounded-md p-2 focus:ring-blue-500 focus:border-blue-500 text-gray-700 dark:text-gray-200 
+                        ${warning && !error ? 'border-yellow-400 focus:border-yellow-500 focus:ring-yellow-500' : 'border-gray-300 dark:border-gray-500'}`}
+                />
+                {warning && !error && (
+                    <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1 flex items-center gap-1">
+                        <span>⚠️</span> {warning}
+                    </p>
+                )}
+            </div>
+        </FormField>
+    );
+};
+
 // --- Main Component ---
 export const VehicleList: React.FC = () => {
     // Queries hooks automatically handle loading states and caching
@@ -112,12 +117,41 @@ export const VehicleList: React.FC = () => {
     const [showArchived, setShowArchived] = useState(false);
     const { showToast } = useToast();
 
-    const { register, handleSubmit, reset, watch, setValue, formState: { errors, isDirty } } = useForm<VehicleFormData>({
+    const { register, handleSubmit, reset, watch, setValue, control, formState: { errors, isDirty } } = useForm<VehicleFormData>({
         resolver: zodResolver(vehicleSchema),
     });
 
     const currentId = watch("id");
     const currentPlateNumber = watch("plateNumber");
+    const currentVehicleType = watch("vehicleType");
+    const currentVehicleCategory = watch("vehicleCategory");
+
+    // Notification wrapper
+    const { notifyOnce } = useMemo(() => createNotify(showToast), [showToast]);
+
+    // Auto-reset category when type changes
+    useEffect(() => {
+        if (!currentVehicleType) {
+            if (currentVehicleCategory) {
+                setValue('vehicleCategory', null);
+            }
+            return;
+        }
+
+        const allowed = getAllowedCategories(currentVehicleType);
+        if (currentVehicleCategory && !allowed.includes(currentVehicleCategory)) {
+            setValue('vehicleCategory', null);
+            notifyOnce(
+                'vehicle-category-reset',
+                'Категория сброшена: не соответствует выбранному типу ТС',
+                { type: 'info', ttlMs: 5000 }
+            );
+        }
+    }, [currentVehicleType]); // Dependency on type only to trigger check on change
+
+    const allowedCategories = useMemo(() => {
+        return getAllowedCategories(currentVehicleType);
+    }, [currentVehicleType]);
 
     const COLLAPSED_SECTIONS_KEY = 'vehicleList_collapsedSections';
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
@@ -162,6 +196,7 @@ export const VehicleList: React.FC = () => {
             fuelConsumptionRates: { summerRate: 0, winterRate: 0 },
             assignedDriverId: null,
             organizationId: '',
+            vehicleCategory: null,
         });
         setIsModalOpen(true);
     };
@@ -192,6 +227,12 @@ export const VehicleList: React.FC = () => {
     };
 
     const onSubmit = async (data: VehicleFormData) => {
+        // Show warnings but don't block save
+        const warnings = getVehicleWarnings(data as any);
+        if (warnings.length > 0) {
+            warnings.forEach(w => showToast(w, 'info'));
+        }
+
         const dataToSave = {
             ...data,
             organizationId: data.organizationId === '' ? null : data.organizationId,
@@ -255,6 +296,32 @@ export const VehicleList: React.FC = () => {
     const columns: Column<EnrichedVehicle>[] = [
         { key: 'plateNumber', label: 'Гос. номер', sortable: true },
         { key: 'brand', label: 'Марка и модель', sortable: true },
+        {
+            key: 'vehicleCategory',
+            label: 'Категория',
+            sortable: true,
+            render: (v) => {
+                const categoryLabels: Record<string, string> = {
+                    'M': 'M (Мопеды)',
+                    'A': 'A (Мотоциклы)',
+                    'A1': 'A1 (Лег. мото)',
+                    'B': 'B (Легковые)',
+                    'B1': 'B1 (Трициклы)',
+                    'C': 'C (Грузовые)',
+                    'C1': 'C1 (Ср. груз.)',
+                    'D': 'D (Автобусы)',
+                    'D1': 'D1 (М. автобусы)',
+                    'BE': 'BE',
+                    'CE': 'CE',
+                    'C1E': 'C1E',
+                    'DE': 'DE',
+                    'D1E': 'D1E',
+                    'Tm': 'Tm (Трамваи)',
+                    'Tb': 'Tb (Троллейб.)'
+                };
+                return <span className="text-sm text-gray-600 dark:text-gray-400">{categoryLabels[v.vehicleCategory || ''] || 'Не указана'}</span>;
+            }
+        },
         { key: 'mileage', label: 'Пробег, км', sortable: true },
         { key: 'driverName', label: 'Водитель', sortable: true },
         {
@@ -283,7 +350,14 @@ export const VehicleList: React.FC = () => {
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                     <CollapsibleSection title="Основная информация" isCollapsed={collapsedSections.basic || false} onToggle={() => toggleSection('basic')}>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <FormField label="Гос. номер" error={errors.plateNumber?.message}><FormInput {...register("plateNumber")} /></FormField>
+                            <ControlledIdentifierInput
+                                name="plateNumber"
+                                label="Гос. номер"
+                                control={control}
+                                normalize={normalizePlateInput}
+                                validate={validatePlateSoft}
+                                placeholder="A 000 AA 00"
+                            />
                             <FormField label="Марка, модель" error={errors.brand?.message}><FormInput {...register("brand")} /></FormField>
                             <FormField label="Организация" error={errors.organizationId?.message}>
                                 <FormSelect {...register("organizationId")}>
@@ -291,9 +365,47 @@ export const VehicleList: React.FC = () => {
                                     {organizations.map(o => <option key={o.id} value={o.id}>{o.shortName}</option>)}
                                 </FormSelect>
                             </FormField>
-                            <FormField label="VIN" error={errors.vin?.message}><FormInput {...register("vin")} /></FormField>
+                            <ControlledIdentifierInput
+                                name="vin"
+                                label="VIN (опционально, 17 символов)"
+                                control={control}
+                                normalize={normalizeVinInput}
+                                validate={validateVinSoft}
+                                placeholder="VIN (необязательно)"
+                            />
+                            <ControlledIdentifierInput
+                                name="bodyNumber"
+                                label="Номер кузова"
+                                control={control}
+                                normalize={normalizeBodyInput}
+                                validate={validateBodySoft}
+                                placeholder="Опционально"
+                            />
+                            <ControlledIdentifierInput
+                                name="chassisNumber"
+                                label="Номер шасси/рамы"
+                                control={control}
+                                normalize={normalizeChassisInput}
+                                validate={validateChassisSoft}
+                                placeholder="Опционально"
+                            />
                             <FormField label="Год выпуска"><FormInput type="number" {...register("year", { valueAsNumber: true })} /></FormField>
                             <FormField label="Тип ТС"><FormSelect {...register("vehicleType")}><option value="">-</option><option>Легковой</option><option>Тягач</option><option>Прицеп</option><option>Автобус</option><option>Спецтехника</option></FormSelect></FormField>
+                            <FormField label="Категория ВУ/УТМ" error={errors.vehicleCategory?.message}>
+                                <FormSelect {...register("vehicleCategory")} disabled={!currentVehicleType}>
+                                    <option value="">
+                                        {currentVehicleType ? 'Не указана' : 'Сначала выберите Тип ТС'}
+                                    </option>
+                                    {allowedCategories.map(cat => (
+                                        <option key={cat} value={cat}>
+                                            {currentVehicleType === 'Спецтехника'
+                                                ? (UTM_CATEGORY_LABELS[cat] || CATEGORY_LABELS[cat])
+                                                : CATEGORY_LABELS[cat]
+                                            }
+                                        </option>
+                                    ))}
+                                </FormSelect>
+                            </FormField>
                             <FormField label="Статус"><FormSelect {...register("status")}>{Object.values(VehicleStatus).map(s => <option key={s} value={s}>{VEHICLE_STATUS_TRANSLATIONS[s]}</option>)}</FormSelect></FormField>
                             <FormField label="Водитель"><FormSelect {...register("assignedDriverId")}><option value="">Не назначен</option>{drivers.map(e => <option key={e.id} value={e.id}>{e.shortName}</option>)}</FormSelect></FormField>
                         </div>
