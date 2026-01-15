@@ -18,12 +18,11 @@ const CollapsibleSection: React.FC<{
       <h3 className="text-lg font-semibold text-gray-800 dark:text-white">{title}</h3>
       {isCollapsed ? <ArrowDownIcon className="h-6 w-6 text-gray-500 dark:text-gray-400" /> : <ArrowUpIcon className="h-6 w-6 text-gray-500 dark:text-gray-400" />}
     </button>
-    <div 
-      className={`bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 transition-all duration-300 overflow-hidden ${
-        isCollapsed 
-          ? 'max-h-0 opacity-0' 
+    <div
+      className={`bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 transition-all duration-300 overflow-hidden ${isCollapsed
+          ? 'max-h-0 opacity-0'
           : 'max-h-[2000px] opacity-100 p-6 border-t rounded-b-lg'
-      }`}
+        }`}
       aria-hidden={isCollapsed}
     >
       {children}
