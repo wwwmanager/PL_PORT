@@ -14,6 +14,7 @@ import {
     validateBodyNumber,
     validateChassisNumber,
 } from '../../shared/validation/vehicle';
+import { getAllowedCategories } from '../../shared/vehicleCategoryMap';
 
 // Helper schemas
 const fuelConsumptionRatesSchema = z.object({
@@ -124,9 +125,6 @@ export const vehicleSchema = z.object({
     maintenanceIntervalKm: z.number().min(0).optional().nullable(),
     lastMaintenanceMileage: z.number().min(0).optional().nullable(),
 }).superRefine((data, ctx) => {
-    // Import is at top of file
-    const { getAllowedCategories } = require('../../shared/vehicleCategoryMap');
-
     // Cross-field validation: vehicleCategory must be allowed for vehicleType
     if (data.vehicleType && data.vehicleCategory) {
         const allowed = getAllowedCategories(data.vehicleType);
