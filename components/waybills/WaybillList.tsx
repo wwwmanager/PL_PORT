@@ -109,21 +109,20 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     // Load persisted filters
     const [filters, setFilters] = useState(() => {
         try {
-            const saved = localStorage.getItem('waybillList_filters');
+            const saved = localStorage.getItem('waybillList_filters_v2');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                // Validate that we have required fields
-                if (parsed.dateFrom !== undefined && parsed.dateTo !== undefined) {
+                if (parsed && typeof parsed === 'object') {
                     return {
-                        dateFrom: parsed.dateFrom || '',
-                        dateTo: parsed.dateTo || '',
+                        dateFrom: parsed.dateFrom ?? '',
+                        dateTo: parsed.dateTo ?? '',
                         status: (parsed.status || '') as WaybillStatus | '',
                         vehicleId: parsed.vehicleId || '',
                         driverId: parsed.driverId || '',
                     };
                 }
             }
-        } catch (e) { /* ignore parse errors */ }
+        } catch (e) { console.error('Failed to load filters', e); }
 
         // Default: current month
         const now = new Date();
@@ -404,8 +403,8 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
         setSelectedIds(new Set());
         // Persist filters
         try {
-            localStorage.setItem('waybillList_filters', JSON.stringify(newFilters));
-        } catch (e) { /* ignore */ }
+            localStorage.setItem('waybillList_filters_v2', JSON.stringify(newFilters));
+        } catch (e) { console.error('Failed to save filters', e); }
     };
 
     // Persist sort config on change
