@@ -2,10 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../shared/Modal';
 import { Vehicle, Employee, Organization, CalendarEvent, SeasonSettings, WaybillCalculationMethod } from '../../types';
-import { BatchPreviewItem, generateBatchPreview, saveBatchWaybills, BatchConfig, GroupingDuration } from '../../services/batchWaybillService';
+import { BatchPreviewItem, generateBatchPreview, saveBatchWaybills, BatchConfig, GroupingDuration, estimateWaybillCount, checkBlanksAvailability, BlankAvailabilityResult } from '../../services/batchWaybillService';
 import { getVehicles, getEmployees, getOrganizations, getWaybills, getCalendarEvents, getSeasonSettings } from '../../services/mockApi';
 import { useToast } from '../../hooks/useToast';
 import { useAuth } from '../../services/auth';
+import { AlertTriangle, FileText, Hash, X } from 'lucide-react';
 
 interface BatchGeneratorModalProps {
     onClose: () => void;
@@ -17,14 +18,14 @@ const BatchGeneratorModal: React.FC<BatchGeneratorModalProps> = ({ onClose, onSu
     const [file, setFile] = useState<File | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [progress, setProgress] = useState({ current: 0, total: 0 });
-    
+
     // Data
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
     const [seasonSettings, setSeasonSettings] = useState<SeasonSettings | undefined>(undefined);
-    
+
     // Config
     const [selectedVehicleId, setSelectedVehicleId] = useState('');
     const [selectedDriverId, setSelectedDriverId] = useState('');
@@ -33,14 +34,18 @@ const BatchGeneratorModal: React.FC<BatchGeneratorModalProps> = ({ onClose, onSu
     const [createEmpty, setCreateEmpty] = useState(false);
     const [grouping, setGrouping] = useState<GroupingDuration>('week');
     const [calculationMethod, setCalculationMethod] = useState<WaybillCalculationMethod>('by_total');
-    
+
     // Responsible persons
     const [selectedDispatcherId, setSelectedDispatcherId] = useState('');
     const [selectedControllerId, setSelectedControllerId] = useState('');
 
     // Preview Data
     const [previewItems, setPreviewItems] = useState<BatchPreviewItem[]>([]);
-    
+
+    // Blank shortage dialog
+    const [blankShortage, setBlankShortage] = useState<BlankAvailabilityResult | null>(null);
+    const [useAutoNumbers, setUseAutoNumbers] = useState(false);
+
     const { showToast } = useToast();
     const { currentUser } = useAuth();
 
@@ -95,7 +100,7 @@ const BatchGeneratorModal: React.FC<BatchGeneratorModalProps> = ({ onClose, onSu
             showToast('Заполните все обязательные поля и выберите файл', 'error');
             return;
         }
-        
+
         // Validation: Check if calendar is populated for roughly current year
         const currentYear = new Date().getFullYear();
         const hasCalendar = calendarEvents.some(e => e.date.startsWith(`${currentYear}-`));
@@ -133,19 +138,20 @@ const BatchGeneratorModal: React.FC<BatchGeneratorModalProps> = ({ onClose, onSu
         });
     };
 
-    const handleSave = async () => {
+    const handleSave = async (forceAutoNumbers: boolean = false) => {
         if (!selectedDispatcherId || !selectedControllerId) {
             showToast('Выберите диспетчера и механика/контролера', 'error');
             return;
         }
 
         setIsLoading(true);
+        setBlankShortage(null);
 
         try {
             // Validation: Check for duplicates
             const existingWaybills = await getWaybills();
             const vehicleWaybills = existingWaybills.filter(w => w.vehicleId === selectedVehicleId && w.status !== 'Cancelled');
-            
+
             const selectedDates = previewItems.filter(i => i.isWorking).map(i => i.dateStr); // YYYY-MM-DD
             const existingDates = new Set(vehicleWaybills.map(w => w.date.split('T')[0])); // YYYY-MM-DD
 
@@ -154,17 +160,16 @@ const BatchGeneratorModal: React.FC<BatchGeneratorModalProps> = ({ onClose, onSu
             if (conflicts.length > 0) {
                 const conflictList = conflicts.slice(0, 3).map(d => new Date(d).toLocaleDateString('ru-RU')).join(', ');
                 const moreCount = conflicts.length > 3 ? ` и еще ${conflicts.length - 3}` : '';
-                
+
                 showToast(`Ошибка: На следующие даты уже существуют путевые листы: ${conflictList}${moreCount}.`, 'error');
                 setIsLoading(false);
                 return;
             }
 
-            setStep('processing');
             const driver = employees.find(e => e.id === selectedDriverId)!;
             const vehicle = vehicles.find(v => v.id === selectedVehicleId)!;
             const orgId = driver.organizationId || organizations[0].id;
-            
+
             const config: BatchConfig = {
                 driverId: selectedDriverId,
                 vehicleId: selectedVehicleId,
@@ -176,11 +181,25 @@ const BatchGeneratorModal: React.FC<BatchGeneratorModalProps> = ({ onClose, onSu
                 calculationMethod: calculationMethod
             };
 
+            // Check blank availability (unless user chose to use auto numbers)
+            if (!forceAutoNumbers && !useAutoNumbers) {
+                const requiredCount = estimateWaybillCount(previewItems, config, seasonSettings);
+                const availability = await checkBlanksAvailability(selectedDriverId, requiredCount);
+
+                if (!availability.sufficient) {
+                    setBlankShortage(availability);
+                    setIsLoading(false);
+                    return;
+                }
+            }
+
+            setStep('processing');
+
             await saveBatchWaybills(
-                previewItems, 
-                config, 
-                vehicle, 
-                driver, 
+                previewItems,
+                config,
+                vehicle,
+                driver,
                 (curr, tot) => {
                     setProgress({ current: curr, total: tot });
                 },
@@ -192,10 +211,99 @@ const BatchGeneratorModal: React.FC<BatchGeneratorModalProps> = ({ onClose, onSu
             onSuccess();
         } catch (e: any) {
             showToast('Ошибка сохранения: ' + e.message, 'error');
-            setStep('preview'); 
+            setStep('preview');
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleUseAutoNumbers = () => {
+        setUseAutoNumbers(true);
+        setBlankShortage(null);
+        handleSave(true);
+    };
+
+    const handleCancelBlankDialog = () => {
+        setBlankShortage(null);
+    };
+
+    const renderBlankShortageDialog = () => {
+        if (!blankShortage) return null;
+
+        const driverName = employees.find(e => e.id === selectedDriverId)?.shortName || 'водителя';
+
+        return (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+                    <div className="p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+                                <AlertTriangle className="w-6 h-6 text-amber-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                    Недостаточно бланков
+                                </h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    Для генерации путевых листов
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mb-6 space-y-2">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-600 dark:text-gray-300">Необходимо ПЛ:</span>
+                                <span className="font-semibold text-gray-900 dark:text-white">{blankShortage.required}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-gray-600 dark:text-gray-300">Бланков у {driverName}:</span>
+                                <span className="font-semibold text-gray-900 dark:text-white">{blankShortage.available}</span>
+                            </div>
+                            <div className="border-t dark:border-gray-600 pt-2 flex justify-between text-sm">
+                                <span className="text-red-600 dark:text-red-400 font-medium">Не хватает:</span>
+                                <span className="font-bold text-red-600 dark:text-red-400">{blankShortage.shortage}</span>
+                            </div>
+                        </div>
+
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+                            Выберите действие:
+                        </p>
+
+                        <div className="space-y-3">
+                            <button
+                                onClick={handleUseAutoNumbers}
+                                className="w-full flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 dark:border-gray-600 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-left"
+                            >
+                                <Hash className="w-5 h-5 text-blue-600" />
+                                <div>
+                                    <div className="font-medium text-gray-900 dark:text-white">
+                                        Использовать автоматические номера
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                        ПЛ будут созданы с номером "Б/Н" (без номера)
+                                    </div>
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={handleCancelBlankDialog}
+                                className="w-full flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 dark:border-gray-600 hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                            >
+                                <X className="w-5 h-5 text-gray-500" />
+                                <div>
+                                    <div className="font-medium text-gray-900 dark:text-white">
+                                        Отмена
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                        Вернуться к предпросмотру и выдать бланки вручную
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     const renderConfigStep = () => (
@@ -259,7 +367,7 @@ const BatchGeneratorModal: React.FC<BatchGeneratorModalProps> = ({ onClose, onSu
                     <input type="date" className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
                 </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4 items-center">
                 <div className="flex items-center">
                     <input id="createEmpty" type="checkbox" checked={createEmpty} onChange={e => setCreateEmpty(e.target.checked)} className="h-4 w-4 text-blue-600 rounded" />
@@ -282,22 +390,22 @@ const BatchGeneratorModal: React.FC<BatchGeneratorModalProps> = ({ onClose, onSu
                 <label className="block text-sm font-medium mb-2 dark:text-gray-200">Метод расчета расхода топлива</label>
                 <div className="flex gap-6">
                     <label className="flex items-center cursor-pointer">
-                        <input 
-                            type="radio" 
-                            name="calcMethod" 
-                            value="by_total" 
-                            checked={calculationMethod === 'by_total'} 
+                        <input
+                            type="radio"
+                            name="calcMethod"
+                            value="by_total"
+                            checked={calculationMethod === 'by_total'}
                             onChange={() => setCalculationMethod('by_total')}
                             className="h-4 w-4 text-blue-600"
                         />
                         <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">По общему пробегу (рекомендуется)</span>
                     </label>
                     <label className="flex items-center cursor-pointer">
-                        <input 
-                            type="radio" 
-                            name="calcMethod" 
-                            value="by_segment" 
-                            checked={calculationMethod === 'by_segment'} 
+                        <input
+                            type="radio"
+                            name="calcMethod"
+                            value="by_segment"
+                            checked={calculationMethod === 'by_segment'}
                             onChange={() => setCalculationMethod('by_segment')}
                             className="h-4 w-4 text-blue-600"
                         />
@@ -305,8 +413,8 @@ const BatchGeneratorModal: React.FC<BatchGeneratorModalProps> = ({ onClose, onSu
                     </label>
                 </div>
                 <p className="mt-1 text-xs text-gray-500">
-                    {calculationMethod === 'by_total' 
-                        ? 'Сначала суммируется пробег, округляется до целого, затем считается расход.' 
+                    {calculationMethod === 'by_total'
+                        ? 'Сначала суммируется пробег, округляется до целого, затем считается расход.'
                         : 'Расход считается и округляется для каждого отрезка отдельно, затем суммируется.'}
                 </p>
             </div>
@@ -334,7 +442,7 @@ const BatchGeneratorModal: React.FC<BatchGeneratorModalProps> = ({ onClose, onSu
                                 <th className="p-2 text-center">Рабочий?</th>
                                 <th className="p-2 text-right">Поездок</th>
                                 <th className="p-2 text-right">Км</th>
-                                <th className="p-2 text-right" style={{width: '100px'}}>Заправка (л)</th>
+                                <th className="p-2 text-right" style={{ width: '100px' }}>Заправка (л)</th>
                                 <th className="p-2">Инфо</th>
                             </tr>
                         </thead>
@@ -346,19 +454,19 @@ const BatchGeneratorModal: React.FC<BatchGeneratorModalProps> = ({ onClose, onSu
                                         <td className="p-2 dark:text-gray-300">{new Date(item.dateStr).toLocaleDateString('ru-RU')}</td>
                                         <td className={`p-2 font-medium ${isWeekend ? 'text-red-500' : 'dark:text-gray-300'}`}>{item.dayOfWeek}</td>
                                         <td className="p-2 text-center">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={item.isWorking} 
-                                                onChange={() => handleToggleWorkDay(idx)} 
+                                            <input
+                                                type="checkbox"
+                                                checked={item.isWorking}
+                                                onChange={() => handleToggleWorkDay(idx)}
                                                 className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                             />
                                         </td>
                                         <td className="p-2 text-right dark:text-gray-300">{item.routes.length}</td>
                                         <td className="p-2 text-right font-mono dark:text-gray-300">{item.totalDistance > 0 ? item.totalDistance.toFixed(1) : '-'}</td>
                                         <td className="p-2 text-right">
-                                            <input 
-                                                type="number" 
-                                                step="0.1" 
+                                            <input
+                                                type="number"
+                                                step="0.1"
                                                 min="0"
                                                 disabled={!item.isWorking}
                                                 value={item.fuelFilled || ''}
@@ -390,34 +498,37 @@ const BatchGeneratorModal: React.FC<BatchGeneratorModalProps> = ({ onClose, onSu
     );
 
     return (
-        <Modal 
-            isOpen={true} 
-            onClose={onClose} 
-            title="Пакетная генерация ПЛ"
-            footer={
-                <>
-                    <button onClick={step === 'config' ? onClose : () => setStep('config')} disabled={step === 'processing'} className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-gray-800 dark:text-white">
-                        {step === 'config' ? 'Отмена' : 'Назад'}
-                    </button>
-                    {step === 'config' && (
-                        <button onClick={handleGeneratePreview} disabled={isLoading} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50">
-                            {isLoading ? 'Анализ...' : 'Далее'}
+        <>
+            <Modal
+                isOpen={true}
+                onClose={onClose}
+                title="Пакетная генерация ПЛ"
+                footer={
+                    <>
+                        <button onClick={step === 'config' ? onClose : () => setStep('config')} disabled={step === 'processing'} className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-gray-800 dark:text-white">
+                            {step === 'config' ? 'Отмена' : 'Назад'}
                         </button>
-                    )}
-                    {step === 'preview' && (
-                        <button onClick={handleSave} className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors">
-                            Сгенерировать
-                        </button>
-                    )}
-                </>
-            }
-        >
-            <div className="min-h-[450px] max-h-[600px] flex flex-col">
-                {step === 'config' && renderConfigStep()}
-                {step === 'preview' && renderPreviewStep()}
-                {step === 'processing' && renderProcessingStep()}
-            </div>
-        </Modal>
+                        {step === 'config' && (
+                            <button onClick={handleGeneratePreview} disabled={isLoading} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50">
+                                {isLoading ? 'Анализ...' : 'Далее'}
+                            </button>
+                        )}
+                        {step === 'preview' && (
+                            <button onClick={() => handleSave()} className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors">
+                                Сгенерировать
+                            </button>
+                        )}
+                    </>
+                }
+            >
+                <div className="min-h-[450px] max-h-[600px] flex flex-col">
+                    {step === 'config' && renderConfigStep()}
+                    {step === 'preview' && renderPreviewStep()}
+                    {step === 'processing' && renderProcessingStep()}
+                </div>
+            </Modal>
+            {renderBlankShortageDialog()}
+        </>
     );
 };
 

@@ -1,29 +1,29 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { 
+import {
     Waybill, WaybillStatus, Route, Attachment, StockTransaction,
     Vehicle, Employee, Organization, WaybillCalculationMethod
 } from '../types';
-import { 
-    useVehicles, 
-    useEmployees, 
-    useOrganizations, 
-    useFuelTypes, 
-    useSavedRoutes, 
-    useSeasonSettings, 
-    useGarageStockItems, 
-    useStockTransactions, 
+import {
+    useVehicles,
+    useEmployees,
+    useOrganizations,
+    useFuelTypes,
+    useSavedRoutes,
+    useSeasonSettings,
+    useGarageStockItems,
+    useStockTransactions,
     useAppSettings,
     QUERY_KEYS
 } from './queries';
-import { 
-    generateId, 
-    getLastWaybillForVehicle, 
-    calculateDriverBalance, 
-    getNextBlankForDriver, 
-    addWaybill, 
-    updateWaybill, 
-    addSavedRoutesFromWaybill, 
+import {
+    generateId,
+    getLastWaybillForVehicle,
+    calculateDriverBalance,
+    getNextBlankForDriver,
+    addWaybill,
+    updateWaybill,
+    addSavedRoutesFromWaybill,
     updateStockTransaction,
     changeWaybillStatus
 } from '../services/mockApi';
@@ -54,12 +54,12 @@ const emptyWaybill: Omit<Waybill, 'id'> = {
     attachments: [],
     reviewerComment: '',
     deviationReason: '',
-    calculationMethod: 'by_total', 
+    calculationMethod: 'by_total',
 };
 
 export const useWaybillForm = (
-    initialWaybill: Waybill | null, 
-    isPrefill: boolean, 
+    initialWaybill: Waybill | null,
+    isPrefill: boolean,
     onSaveSuccess?: (waybill: Waybill) => void
 ) => {
     const { showToast } = useToast();
@@ -86,14 +86,14 @@ export const useWaybillForm = (
     const [autoFillMessage, setAutoFillMessage] = useState('');
     const [dayMode, setDayMode] = useState<'single' | 'multi'>('multi');
     const [minDate, setMinDate] = useState<string>('');
-    
+
     // Extra fields
     const [fuelCardBalance, setFuelCardBalance] = useState<number | null>(null);
     const [fuelFilledError, setFuelFilledError] = useState<string | null>(null);
     const [linkedTxId, setLinkedTxId] = useState<string | null>(null);
     const [initialLinkedTxId, setInitialLinkedTxId] = useState<string | null>(null);
     const [linkedTransactions, setLinkedTransactions] = useState<StockTransaction[]>([]);
-    
+
     // New state to track if fuelPlanned was manually edited or should be preserved
     const [isFuelPlannedManual, setIsFuelPlannedManual] = useState(false);
 
@@ -101,7 +101,7 @@ export const useWaybillForm = (
     const selectedVehicle = useMemo(() => vehicles.find(v => v.id === formData.vehicleId), [formData.vehicleId, vehicles]);
     const selectedDriver = useMemo(() => employees.find(e => e.id === formData.driverId), [formData.driverId, employees]);
     const selectedFuelType = useMemo(() => fuelTypes.find(f => f.id === selectedVehicle?.fuelTypeId), [selectedVehicle, fuelTypes]);
-    
+
     const uniqueLocations = useMemo(() => {
         const locations = new Set<string>();
         savedRoutes.forEach(route => {
@@ -160,7 +160,7 @@ export const useWaybillForm = (
             seasonSettings,
             formData.date,
             dayMode,
-            formData.calculationMethod 
+            formData.calculationMethod
         );
     }, [formData.routes, selectedVehicle, seasonSettings, formData.date, dayMode, formData.calculationMethod]);
 
@@ -182,12 +182,12 @@ export const useWaybillForm = (
         } else {
             setFuelCardBalance(null);
         }
-    }, [formData.driverId, formData.date, allTransactions]); 
+    }, [formData.driverId, formData.date, allTransactions]);
 
     // 1. Main Initialization Effect (Runs ONLY on mount or prop change)
     useEffect(() => {
         let formDataToSet: Omit<Waybill, 'id'> | Waybill;
-        
+
         if (isPrefill && initialWaybill) {
             formDataToSet = {
                 ...emptyWaybill,
@@ -201,15 +201,15 @@ export const useWaybillForm = (
                 controllerId: initialWaybill.controllerId,
             };
         } else {
-             formDataToSet = initialWaybill ? initialWaybill : { ...emptyWaybill };
-             if (!formDataToSet.calculationMethod) {
-                 formDataToSet.calculationMethod = 'by_total';
-             }
+            formDataToSet = initialWaybill ? initialWaybill : { ...emptyWaybill };
+            if (!formDataToSet.calculationMethod) {
+                formDataToSet.calculationMethod = 'by_total';
+            }
         }
-        
+
         setFormData(formDataToSet);
         setInitialFormData(JSON.parse(JSON.stringify(formDataToSet)));
-        setIsFuelPlannedManual(false); 
+        setIsFuelPlannedManual(false);
 
         if (initialWaybill && !isPrefill) {
             const fromDate = initialWaybill.validFrom.split('T')[0];
@@ -223,13 +223,13 @@ export const useWaybillForm = (
     // 2. Default Organization Effect
     useEffect(() => {
         if (!initialWaybill && !isPrefill && organizations.length > 0) {
-             setFormData(prev => {
-                 if (!prev.organizationId) {
-                     const ownOrg = organizations.find(o => o.isOwn);
-                     if (ownOrg) return { ...prev, organizationId: ownOrg.id };
-                 }
-                 return prev;
-             });
+            setFormData(prev => {
+                if (!prev.organizationId) {
+                    const ownOrg = organizations.find(o => o.isOwn);
+                    if (ownOrg) return { ...prev, organizationId: ownOrg.id };
+                }
+                return prev;
+            });
         }
     }, [organizations, initialWaybill, isPrefill]);
 
@@ -237,7 +237,7 @@ export const useWaybillForm = (
     useEffect(() => {
         if (initialWaybill && 'id' in initialWaybill) {
             const linkedTx = allTransactions.find(tx => tx.waybillId === initialWaybill.id);
-            if(linkedTx) {
+            if (linkedTx) {
                 setLinkedTxId(linkedTx.id);
                 setInitialLinkedTxId(linkedTx.id);
             }
@@ -247,11 +247,11 @@ export const useWaybillForm = (
     // 4. Initial Number Generation (If driver exists on load/prefill)
     useEffect(() => {
         if ((!initialWaybill || isPrefill) && selectedDriver) {
-             if (!formData.number && !formData.blankId) {
-                  updateWaybillNumberForDriverInternal(selectedDriver, formData);
-             }
+            if (!formData.number && !formData.blankId) {
+                updateWaybillNumberForDriverInternal(selectedDriver, formData);
+            }
         }
-    }, [selectedDriver, isPrefill, initialWaybill]); 
+    }, [selectedDriver, isPrefill, initialWaybill]);
 
     useEffect(() => {
         if (!formData || !('id' in formData) || !formData.id) {
@@ -273,7 +273,7 @@ export const useWaybillForm = (
         setFormData(prev => {
             let updated = { ...prev };
             let changed = false;
-            
+
             // Auto-fill only if empty or invalid
             if (!updated.dispatcherId && selectedDriver.dispatcherId) {
                 updated.dispatcherId = selectedDriver.dispatcherId;
@@ -285,9 +285,9 @@ export const useWaybillForm = (
                     changed = true;
                 }
             } else if (!updated.dispatcherId && dispatchers.length > 0) {
-                 // Try to set default if empty
-                 updated.dispatcherId = dispatchers[0].id;
-                 changed = true;
+                // Try to set default if empty
+                updated.dispatcherId = dispatchers[0].id;
+                changed = true;
             }
 
             if (!updated.controllerId && selectedDriver.controllerId) {
@@ -323,11 +323,11 @@ export const useWaybillForm = (
         const newOdoEnd = startOdo + calculationStats.distance;
         const startFuel = Number(formData.fuelAtStart) || 0;
         const filledFuel = Number(formData.fuelFilled) || 0;
-        
+
         const routesJson = JSON.stringify(formData.routes);
         const initialRoutesJson = initialFormData ? JSON.stringify(initialFormData.routes) : '';
         const routesChanged = routesJson !== initialRoutesJson;
-        
+
         let effectiveFuelPlanned = formData.fuelPlanned;
 
         if (isFuelPlannedManual) {
@@ -339,11 +339,11 @@ export const useWaybillForm = (
         }
 
         const newFuelAtEnd = Math.round((startFuel + filledFuel - (effectiveFuelPlanned || 0)) * 100) / 100;
-        
+
         setFormData(prev => {
             if (
-                prev.fuelPlanned === effectiveFuelPlanned && 
-                prev.odometerEnd === newOdoEnd && 
+                prev.fuelPlanned === effectiveFuelPlanned &&
+                prev.odometerEnd === newOdoEnd &&
                 prev.fuelAtEnd === newFuelAtEnd
             ) {
                 return prev;
@@ -356,16 +356,16 @@ export const useWaybillForm = (
             };
         });
     }, [
-        calculationStats, 
-        formData.odometerStart, 
-        formData.fuelAtStart, 
-        formData.fuelFilled, 
-        selectedVehicle, 
+        calculationStats,
+        formData.odometerStart,
+        formData.fuelAtStart,
+        formData.fuelFilled,
+        selectedVehicle,
         seasonSettings,
         isFuelPlannedManual,
         initialFormData,
         isPrefill,
-        formData.routes 
+        formData.routes
     ]);
 
 
@@ -374,20 +374,21 @@ export const useWaybillForm = (
     const updateWaybillNumberForDriverInternal = async (driver: Employee | null, currentData: Omit<Waybill, 'id'> | Waybill) => {
         if (!driver?.id) {
             if (!('id' in currentData)) {
-                 setFormData(prev => ({ ...prev, number: '', blankId: null, blankSeries: null, blankNumber: null }));
+                setFormData(prev => ({ ...prev, number: '', blankId: null, blankSeries: null, blankNumber: null }));
             }
             return;
         }
-      
+
         if (!('id' in currentData) || !currentData.id || isPrefill) {
             const orgId = driver.organizationId;
             if (!orgId) return;
-      
+
             const nextBlank = await getNextBlankForDriver(driver.id, orgId);
             if (nextBlank) {
                 setFormData(prev => ({
                     ...prev,
-                    number: '',
+                    // Fix: Set the visual number immediately so it's not empty (which would trigger auto-generation)
+                    number: `${nextBlank.series} ${String(nextBlank.number).padStart(6, '0')}`,
                     blankId: nextBlank.id,
                     blankSeries: nextBlank.series,
                     blankNumber: nextBlank.number
@@ -400,24 +401,21 @@ export const useWaybillForm = (
 
     const isRouteDateValid = (routeDate?: string): boolean => {
         if (!routeDate || dayMode === 'single') return true;
-        try {
-            const rDate = new Date(routeDate);
-            const sDate = new Date(formData.validFrom.split('T')[0]);
-            const eDate = new Date(formData.validTo.split('T')[0]);
-            rDate.setHours(0,0,0,0);
-            sDate.setHours(0,0,0,0);
-            eDate.setHours(0,0,0,0);
-            return rDate >= sDate && rDate <= eDate;
-        } catch {
-            return false;
-        }
+
+        // Ensure we are comparing comparable formats (YYYY-MM-DD)
+        const rDate = routeDate;
+        const sDate = formData.validFrom.split('T')[0];
+        const eDate = formData.validTo.split('T')[0];
+
+        // Lexicographical comparison works for ISO dates
+        return rDate >= sDate && rDate <= eDate;
     };
 
     // --- Field Handlers ---
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        
+
         if (name === 'driverId') {
             const driver = employees.find(d => d.id === value);
             setFormData(prev => {
@@ -454,12 +452,12 @@ export const useWaybillForm = (
             setLinkedTxId(null);
             setFuelFilledError(null);
         }
-        
+
         if (name === 'fuelPlanned') {
             setIsFuelPlannedManual(true);
         }
 
-        setFormData(prev => ({...prev, [name]: numericValue }));
+        setFormData(prev => ({ ...prev, [name]: numericValue }));
     };
 
     const handleVehicleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -467,7 +465,7 @@ export const useWaybillForm = (
         const sVehicle = vehicles.find(v => v.id === vehicleId);
         setAutoFillMessage('');
         setMinDate('');
-        
+
         setIsFuelPlannedManual(false);
 
         if (sVehicle) {
@@ -478,32 +476,32 @@ export const useWaybillForm = (
                 vehicleId: sVehicle.id,
                 driverId: assignedDriverId,
             };
-            
+
             if (driver && (!('id' in formData) || !formData.id || isPrefill)) {
-                 if (driver.dispatcherId) updates.dispatcherId = driver.dispatcherId;
-                 if (driver.controllerId) updates.controllerId = driver.controllerId;
+                if (driver.dispatcherId) updates.dispatcherId = driver.dispatcherId;
+                if (driver.controllerId) updates.controllerId = driver.controllerId;
             }
-            
+
             if (!('id' in formData) || !formData.id || isPrefill) {
-                 const lastWaybill = await getLastWaybillForVehicle(sVehicle.id);
-                 
-                 if (lastWaybill) {
-                     updates.odometerStart = Math.round(lastWaybill.odometerEnd ?? sVehicle.mileage);
-                     updates.fuelAtStart = lastWaybill.fuelAtEnd ?? sVehicle.currentFuel;
-                     
-                     setAutoFillMessage(`Данные загружены из последнего ПЛ (от ${new Date(lastWaybill.date).toLocaleDateString()}).`);
-                     setMinDate(lastWaybill.date);
-                 } else {
-                     updates.odometerStart = Math.round(sVehicle.mileage);
-                     updates.fuelAtStart = sVehicle.currentFuel;
-                     setAutoFillMessage(`Стартовые значения загружены из карточки ТС (история пуста).`);
-                 }
-                 
-                 const tempData = { ...formData, ...updates };
-                 // Await this to prevent race condition
-                 await updateWaybillNumberForDriverInternal(driver || null, tempData as any);
+                const lastWaybill = await getLastWaybillForVehicle(sVehicle.id);
+
+                if (lastWaybill) {
+                    updates.odometerStart = Math.round(lastWaybill.odometerEnd ?? sVehicle.mileage);
+                    updates.fuelAtStart = lastWaybill.fuelAtEnd ?? sVehicle.currentFuel;
+
+                    setAutoFillMessage(`Данные загружены из последнего ПЛ (от ${new Date(lastWaybill.date).toLocaleDateString()}).`);
+                    setMinDate(lastWaybill.date);
+                } else {
+                    updates.odometerStart = Math.round(sVehicle.mileage);
+                    updates.fuelAtStart = sVehicle.currentFuel;
+                    setAutoFillMessage(`Стартовые значения загружены из карточки ТС (история пуста).`);
+                }
+
+                const tempData = { ...formData, ...updates };
+                // Await this to prevent race condition
+                await updateWaybillNumberForDriverInternal(driver || null, tempData as any);
             }
-            
+
             const newRoutes = formData.routes.map(r => ({
                 ...r,
                 isCityDriving: sVehicle.useCityModifier ? r.isCityDriving : false,
@@ -544,24 +542,34 @@ export const useWaybillForm = (
     const handleAddRoute = () => {
         setIsFuelPlannedManual(false);
         const lastRoute = formData.routes.length > 0 ? formData.routes[formData.routes.length - 1] : null;
-        const newRoute = { 
-            id: generateId(), 
-            from: lastRoute ? lastRoute.to : '', 
-            to: '', 
-            distanceKm: 0, 
-            isCityDriving: false, 
-            isWarming: false, 
+        const newRoute = {
+            id: generateId(),
+            from: lastRoute ? lastRoute.to : '',
+            to: '',
+            distanceKm: 0,
+            isCityDriving: false,
+            isWarming: false,
             date: lastRoute?.date ? lastRoute.date : (dayMode === 'multi' ? formData.validFrom.split('T')[0] : undefined)
         };
         setFormData(prev => ({ ...prev, routes: [...prev.routes, newRoute] }));
     };
 
     const handleRouteUpdate = (id: string, field: keyof Route, value: any) => {
-        if (field === 'date' && typeof value === 'string' && !isRouteDateValid(value)) {
-            showToast(`Дата маршрута выходит за пределы диапазона путевого листа.`, 'error');
-            return; 
+        let updateValue = value;
+
+        // Normalize date if needed (DD.MM.YYYY -> YYYY-MM-DD)
+        if (field === 'date' && typeof value === 'string') {
+            if (/^\d{2}\.\d{2}\.\d{4}$/.test(value)) {
+                const [day, month, year] = value.split('.');
+                updateValue = `${year}-${month}-${day}`;
+            }
         }
-        
+
+        if (field === 'date' && typeof updateValue === 'string' && !isRouteDateValid(updateValue)) {
+            showToast(`Дата маршрута выходит за пределы диапазона путевого листа.`, 'error');
+            return;
+        }
+
         if (['distanceKm', 'isCityDriving', 'isWarming', 'from', 'to'].includes(field)) {
             setIsFuelPlannedManual(false);
         }
@@ -569,10 +577,10 @@ export const useWaybillForm = (
         setFormData(prev => {
             const newRoutes = prev.routes.map(r => {
                 if (r.id !== id) return r;
-                const updatedRoute = { ...r, [field]: value };
+                const updatedRoute = { ...r, [field]: updateValue };
                 if ((field === 'from' || field === 'to')) {
-                    const matchingSavedRoute = savedRoutes.find(sr => 
-                        sr.from?.toLowerCase() === updatedRoute.from.toLowerCase() && 
+                    const matchingSavedRoute = savedRoutes.find(sr =>
+                        sr.from?.toLowerCase() === updatedRoute.from.toLowerCase() &&
                         sr.to?.toLowerCase() === updatedRoute.to.toLowerCase()
                     );
                     if (matchingSavedRoute) {
@@ -598,7 +606,7 @@ export const useWaybillForm = (
             setIsFuelPlannedManual(false);
             setFormData(prev => ({ ...prev, routes: [...prev.routes, ...generatedRoutes] }));
             setAiPrompt('');
-        } catch(error) {
+        } catch (error) {
             showToast((error as Error).message, 'error');
         } finally {
             setIsGenerating(false);
@@ -610,32 +618,32 @@ export const useWaybillForm = (
     const validateForm = async (): Promise<boolean> => {
         // Auto-fix: if dispatcher missing, try to set from list
         if (!formData.dispatcherId && dispatchers.length > 0) {
-             setFormData(prev => ({ ...prev, dispatcherId: dispatchers[0].id }));
-             // Allow validation to pass this time, assuming the setFormData will take effect
-             // Actually React state update won't be immediate for this check.
-             // We return true but rely on the fact that next render will have it. 
-             // BUT for save to work NOW, we need to pass corrected data.
-             // Best to just block and let user click again or auto-fill worked in useEffect.
-             // However, let's be strict but helpful.
-             
-             // Hack: Directly mutate for validation check context if we want to proceed? 
-             // No, better to just error if useEffect didn't catch it.
-             // But we added logic in useEffect to auto-fill.
-             // If still empty, it means no dispatchers exist.
+            setFormData(prev => ({ ...prev, dispatcherId: dispatchers[0].id }));
+            // Allow validation to pass this time, assuming the setFormData will take effect
+            // Actually React state update won't be immediate for this check.
+            // We return true but rely on the fact that next render will have it. 
+            // BUT for save to work NOW, we need to pass corrected data.
+            // Best to just block and let user click again or auto-fill worked in useEffect.
+            // However, let's be strict but helpful.
+
+            // Hack: Directly mutate for validation check context if we want to proceed? 
+            // No, better to just error if useEffect didn't catch it.
+            // But we added logic in useEffect to auto-fill.
+            // If still empty, it means no dispatchers exist.
         }
 
         if (!formData.dispatcherId && dispatchers.length === 0) {
-             // Edge case: No dispatchers in system. Allow save if user is admin? 
-             // Or just warn.
-             showToast('В системе нет диспетчеров. Создайте сотрудника с типом "Диспетчер".', 'error');
-             return false;
+            // Edge case: No dispatchers in system. Allow save if user is admin? 
+            // Or just warn.
+            showToast('В системе нет диспетчеров. Создайте сотрудника с типом "Диспетчер".', 'error');
+            return false;
         }
 
         if (!formData.dispatcherId) {
             showToast('Диспетчер не назначен.', 'error');
             return false;
         }
-        
+
         if (('id' in formData) && (!formData.number || formData.number === 'БЛАНКОВ НЕТ')) {
             showToast('Невозможно сохранить ПЛ без номера.', 'error');
             return false;
@@ -645,8 +653,8 @@ export const useWaybillForm = (
             return false;
         }
         if (selectedVehicle && !selectedVehicle.disableFuelCapacityCheck && selectedVehicle.fuelTankCapacity) {
-             const startFuel = formData.fuelAtStart || 0;
-             const endFuel = formData.fuelAtEnd || 0;
+            const startFuel = formData.fuelAtStart || 0;
+            const endFuel = formData.fuelAtEnd || 0;
             if (startFuel > selectedVehicle.fuelTankCapacity) {
                 showToast(`Начальный остаток топлива превышает объем бака.`, 'error');
                 return false;
@@ -689,13 +697,13 @@ export const useWaybillForm = (
                 savedWaybill = await updateWaybill(formData as Waybill);
             } else {
                 savedWaybill = await addWaybill(formData as Omit<Waybill, 'id'>, { userId: currentUser?.id });
-                setFormData(savedWaybill); 
+                setFormData(savedWaybill);
             }
 
             if (savedWaybill && savedWaybill.routes.length > 0) {
                 await addSavedRoutesFromWaybill(savedWaybill.routes);
             }
-            
+
             const originalLinkedTx = allTransactions.find(tx => tx.id === initialLinkedTxId);
             if (originalLinkedTx && originalLinkedTx.id !== linkedTxId) {
                 await updateStockTransaction({ ...originalLinkedTx, waybillId: null });
@@ -713,10 +721,10 @@ export const useWaybillForm = (
             }
             setInitialFormData(JSON.parse(JSON.stringify(savedWaybill)));
             setIsFuelPlannedManual(false); // Reset manual flag on save
-            
+
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.waybills });
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.vehicles });
-            
+
             if (onSaveSuccess) onSaveSuccess(savedWaybill);
             return savedWaybill;
         } catch (error) {
@@ -730,25 +738,25 @@ export const useWaybillForm = (
 
     const handleStatusChange = async (nextStatus: WaybillStatus) => {
         if (nextStatus === WaybillStatus.POSTED) {
-             const fuelEnd = formData.fuelAtEnd ?? 0;
-             if (fuelEnd < -0.05) { 
-                 showToast(`Ошибка: Отрицательный остаток топлива (${fuelEnd.toFixed(2)} л). Проведение невозможно.`, 'error');
-                 return;
-             }
-             
-             if (!isDirty) {
-                 const isValid = await validateForm();
-                 if (!isValid) return;
-             }
+            const fuelEnd = formData.fuelAtEnd ?? 0;
+            if (fuelEnd < -0.05) {
+                showToast(`Ошибка: Отрицательный остаток топлива (${fuelEnd.toFixed(2)} л). Проведение невозможно.`, 'error');
+                return;
+            }
+
+            if (!isDirty) {
+                const isValid = await validateForm();
+                if (!isValid) return;
+            }
         }
 
         let savedWaybill = 'id' in formData ? formData as Waybill : null;
-        
+
         if (isDirty) {
             savedWaybill = await handleSave(true);
-            if (!savedWaybill) return; 
+            if (!savedWaybill) return;
         }
-        
+
         if (!savedWaybill || !savedWaybill.id) {
             showToast('Сначала сохраните путевой лист.', 'error');
             return;
@@ -760,13 +768,13 @@ export const useWaybillForm = (
                 appMode: appSettings?.appMode || 'driver',
             });
             const updatedWaybill = result.data as Waybill;
-            
+
             setFormData({ ...updatedWaybill });
             setInitialFormData(JSON.parse(JSON.stringify(updatedWaybill)));
-            
+
             const statusText = nextStatus === WaybillStatus.POSTED ? 'проведен' : 'обновлен';
             showToast(`Путевой лист успешно ${statusText}`, 'success');
-            
+
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.waybills });
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.vehicles });
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.employees });
@@ -778,7 +786,7 @@ export const useWaybillForm = (
     const handleSelectExpense = (tx: StockTransaction) => {
         const fuelItem = tx.items.find(item => stockItems.find(si => si.id === item.stockItemId)?.fuelTypeId);
         if (fuelItem) {
-            setFormData(prev => ({...prev, fuelFilled: fuelItem.quantity}));
+            setFormData(prev => ({ ...prev, fuelFilled: fuelItem.quantity }));
             setLinkedTxId(tx.id);
         } else {
             showToast('В накладной не найдено топливо.', 'error');
@@ -797,18 +805,18 @@ export const useWaybillForm = (
                 content: e.target?.result as string,
                 userId: 'local-user',
             };
-            setFormData(prev => ({...prev, attachments: [...(prev.attachments || []), newAttachment]}));
+            setFormData(prev => ({ ...prev, attachments: [...(prev.attachments || []), newAttachment] }));
         };
         reader.readAsDataURL(file);
     };
 
     const removeAttachment = (name: string) => {
-        setFormData(prev => ({...prev, attachments: prev.attachments?.filter(att => att.name !== name)}));
+        setFormData(prev => ({ ...prev, attachments: prev.attachments?.filter(att => att.name !== name) }));
     };
 
     const handleImportConfirm = (newRoutes: Route[]) => {
         setIsFuelPlannedManual(false);
-        setFormData(prev => ({...prev, routes: [...prev.routes, ...newRoutes]}));
+        setFormData(prev => ({ ...prev, routes: [...prev.routes, ...newRoutes] }));
         showToast(`Добавлено ${newRoutes.length} сегментов.`, 'success');
     };
 
@@ -829,7 +837,7 @@ export const useWaybillForm = (
         fuelFilledError,
         linkedTxId,
         linkedTransactions,
-        
+
         selectedVehicle,
         selectedDriver,
         selectedFuelType,

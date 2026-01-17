@@ -1,42 +1,43 @@
 
 import { parseAndPreviewRouteFile, RouteSegment } from './routeParserService';
 import { isWorkingDayStandard, getHolidayName, getWorkingWeekRange } from './productionCalendarService';
-import { Waybill, WaybillStatus, Vehicle, Employee, WaybillBlank, SeasonSettings, CalendarEvent, WaybillCalculationMethod } from '../types';
+import { Waybill, WaybillStatus, Vehicle, Employee, WaybillBlank, SeasonSettings, CalendarEvent, WaybillCalculationMethod, Route } from '../types';
 import { addWaybill, reserveBlank, getBlanks } from './mockApi';
-import { calculateDistance, isWinterDate } from '../utils/waybillCalculations';
+import { calculateDistance } from '../utils/waybillCalculations';
+import { isWinterDate, calculateFuel, mapLegacyMethod, FuelCalculationMethod } from './fuelCalculationService';
 
 export interface BatchPreviewItem {
-  dateStr: string; // yyyy-mm-dd
-  dateObj: Date;
-  dayOfWeek: string;
-  isWorking: boolean;
-  holidayName?: string;
-  routes: RouteSegment[];
-  totalDistance: number;
-  warnings: string[];
-  fuelFilled?: number;
+    dateStr: string; // yyyy-mm-dd
+    dateObj: Date;
+    dayOfWeek: string;
+    isWorking: boolean;
+    holidayName?: string;
+    routes: RouteSegment[];
+    totalDistance: number;
+    warnings: string[];
+    fuelFilled?: number;
 }
 
 export type GroupingDuration = 'day' | '2days' | 'week' | 'month';
 
 export interface BatchConfig {
-  driverId: string;
-  vehicleId: string;
-  organizationId: string;
-  dispatcherId: string;
-  controllerId: string;
-  createEmptyDays: boolean;
-  groupingDuration: GroupingDuration;
-  calculationMethod: WaybillCalculationMethod; // Added
+    driverId: string;
+    vehicleId: string;
+    organizationId: string;
+    dispatcherId: string;
+    controllerId: string;
+    createEmptyDays: boolean;
+    groupingDuration: GroupingDuration;
+    calculationMethod: WaybillCalculationMethod; // Added
 }
 
 const normalizeDate = (dateStr: string): string => {
-  if (!dateStr) return '';
-  const parts = dateStr.split('.');
-  if (parts.length === 3) {
-      return `${parts[2]}-${parts[1]}-${parts[0]}`;
-  }
-  return dateStr;
+    if (!dateStr) return '';
+    const parts = dateStr.split('.');
+    if (parts.length === 3) {
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return dateStr;
 };
 
 const timeToMinutes = (time: string | undefined): number | null => {
@@ -60,118 +61,136 @@ const toLocalISO = (date: Date): string => {
 };
 
 export const generateBatchPreview = async (
-  file: File,
-  periodStart?: string,
-  periodEnd?: string,
-  calendarEvents?: CalendarEvent[]
+    file: File,
+    periodStart?: string,
+    periodEnd?: string,
+    calendarEvents?: CalendarEvent[]
 ): Promise<BatchPreviewItem[]> => {
-  const buffer = await file.arrayBuffer();
-  
-  const { routeSegments } = await parseAndPreviewRouteFile(buffer, file.name, file.type, {
-    autoRemoveEmpty: true 
-  });
+    const buffer = await file.arrayBuffer();
 
-  const segmentsByDate = new Map<string, RouteSegment[]>();
-  const normalizedDates: string[] = [];
-
-  routeSegments.forEach(seg => {
-    if (seg.date) {
-       const isoDate = normalizeDate(seg.date);
-       
-       if (!segmentsByDate.has(isoDate)) {
-         segmentsByDate.set(isoDate, []);
-         normalizedDates.push(isoDate);
-       }
-       segmentsByDate.get(isoDate)!.push(seg);
-    }
-  });
-
-  let start: Date;
-  let end: Date;
-
-  if (periodStart && periodEnd) {
-      start = new Date(periodStart);
-      end = new Date(periodEnd);
-  } else {
-      normalizedDates.sort(); 
-      if (normalizedDates.length > 0) {
-          start = new Date(normalizedDates[0]);
-          end = new Date(normalizedDates[normalizedDates.length - 1]);
-      } else {
-          start = new Date();
-          end = new Date();
-      }
-  }
-
-  const current = new Date(start);
-  current.setHours(0,0,0,0);
-  const endDate = new Date(end);
-  endDate.setHours(0,0,0,0);
-
-  const items: BatchPreviewItem[] = [];
-
-  while (current <= endDate) {
-    const dateKey = toLocalISO(current);
-
-    const routes = segmentsByDate.get(dateKey) || [];
-    const dist = calculateDistance(routes as any[]);
-    
-    // Pass events to service functions
-    const isStandardWorking = isWorkingDayStandard(current, calendarEvents);
-    const holiday = getHolidayName(current, calendarEvents);
-
-    const isWorking = isStandardWorking || routes.length > 0;
-
-    const warnings: string[] = [];
-    if (!isStandardWorking && routes.length > 0) {
-        warnings.push('Поездки в выходной/праздник');
-    }
-
-    items.push({
-        dateStr: dateKey,
-        dateObj: new Date(current),
-        dayOfWeek: current.toLocaleDateString('ru-RU', { weekday: 'short' }),
-        isWorking,
-        holidayName: holiday,
-        routes,
-        totalDistance: dist,
-        warnings,
-        fuelFilled: 0 
+    const { routeSegments } = await parseAndPreviewRouteFile(buffer, file.name, file.type, {
+        autoRemoveEmpty: true
     });
 
-    current.setDate(current.getDate() + 1);
-  }
+    const segmentsByDate = new Map<string, RouteSegment[]>();
+    const normalizedDates: string[] = [];
 
-  return items;
+    routeSegments.forEach(seg => {
+        if (seg.date) {
+            const isoDate = normalizeDate(seg.date);
+
+            if (!segmentsByDate.has(isoDate)) {
+                segmentsByDate.set(isoDate, []);
+                normalizedDates.push(isoDate);
+            }
+            segmentsByDate.get(isoDate)!.push(seg);
+        }
+    });
+
+    let start: Date;
+    let end: Date;
+
+    if (periodStart && periodEnd) {
+        start = new Date(periodStart);
+        end = new Date(periodEnd);
+    } else {
+        normalizedDates.sort();
+        if (normalizedDates.length > 0) {
+            start = new Date(normalizedDates[0]);
+            end = new Date(normalizedDates[normalizedDates.length - 1]);
+        } else {
+            start = new Date();
+            end = new Date();
+        }
+    }
+
+    const current = new Date(start);
+    current.setHours(0, 0, 0, 0);
+    const endDate = new Date(end);
+    endDate.setHours(0, 0, 0, 0);
+
+    const items: BatchPreviewItem[] = [];
+
+    while (current <= endDate) {
+        const dateKey = toLocalISO(current);
+
+        const routes = segmentsByDate.get(dateKey) || [];
+        const dist = calculateDistance(routes as any[]);
+
+        // Pass events to service functions
+        const isStandardWorking = isWorkingDayStandard(current, calendarEvents);
+        const holiday = getHolidayName(current, calendarEvents);
+
+        const isWorking = isStandardWorking || routes.length > 0;
+
+        const warnings: string[] = [];
+        if (!isStandardWorking && routes.length > 0) {
+            warnings.push('Поездки в выходной/праздник');
+        }
+
+        items.push({
+            dateStr: dateKey,
+            dateObj: new Date(current),
+            dayOfWeek: current.toLocaleDateString('ru-RU', { weekday: 'short' }),
+            isWorking,
+            holidayName: holiday,
+            routes,
+            totalDistance: dist,
+            warnings,
+            fuelFilled: 0
+        });
+
+        current.setDate(current.getDate() + 1);
+    }
+
+    return items;
 };
 
-const calculateGroupConsumption = (group: BatchPreviewItem[], vehicle: Vehicle, seasonSettings: SeasonSettings | null) => {
-    let totalDist = 0;
-    let totalConsumption = 0;
+const calculateGroupConsumption = (
+    group: BatchPreviewItem[],
+    vehicle: Vehicle,
+    seasonSettings: SeasonSettings | null,
+    method: FuelCalculationMethod = 'BOILER'
+) => {
+    // Flatten routes from all items in the group, preserving dates
+    const routes: Route[] = group.flatMap(item =>
+        item.routes.map(r => ({
+            id: r.id,
+            from: r.from,
+            to: r.to,
+            distanceKm: r.distanceKm,
+            isCityDriving: false, // RouteSegment doesn't have these
+            isWarming: false,
+            date: item.dateStr
+        }))
+    );
 
-    for (const item of group) {
-        totalDist += item.totalDistance;
-        const isWinter = isWinterDate(item.dateStr, seasonSettings);
-        const rate = isWinter ? vehicle.fuelConsumptionRates.winterRate : vehicle.fuelConsumptionRates.summerRate;
-        totalConsumption += (item.totalDistance / 100) * rate;
-    }
-    return { distance: totalDist, consumption: totalConsumption };
+    // Use unified fuel calculation service
+    const result = calculateFuel(method, {
+        routes,
+        rates: vehicle.fuelConsumptionRates,
+        baseDate: group[0]?.dateStr || new Date().toISOString(),
+        seasonSettings,
+        dayMode: 'multi'
+    });
+
+    return { distance: result.distance, consumption: result.consumption };
 };
 
 const getISOWeek = (date: Date) => {
     const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
     const dayNum = d.getUTCDay() || 7;
     d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
-    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1)/7);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 };
 
 const createWaybillFromGroup = async (
-    group: BatchPreviewItem[], 
-    config: BatchConfig, 
-    vehicle: Vehicle, 
-    blank: WaybillBlank | undefined, 
-    startOdo: number, 
+    group: BatchPreviewItem[],
+    config: BatchConfig,
+    vehicle: Vehicle,
+    blank: WaybillBlank | undefined,
+    startOdo: number,
     startFuel: number,
     actorId?: string,
     fuelFilledSum: number = 0,
@@ -180,57 +199,57 @@ const createWaybillFromGroup = async (
 ) => {
     const first = group[0];
     const last = group[group.length - 1];
-    
+
     let validFromStr = first.dateStr;
     let validToStr = last.dateStr;
 
     if (config.groupingDuration === 'week') {
         const { start, end } = getWorkingWeekRange(first.dateObj, calendarEvents);
-        
+
         let finalStart = start;
         let finalEnd = end;
 
         if (seasonSettings) {
-             const targetSeasonIsWinter = isWinterDate(first.dateStr, seasonSettings);
-             
-             const startStr = toLocalISO(finalStart);
-             if (isWinterDate(startStr, seasonSettings) !== targetSeasonIsWinter) {
-                 let d = new Date(finalStart);
-                 while (d < finalEnd) {
-                     const dStr = toLocalISO(d);
-                     if (isWinterDate(dStr, seasonSettings) === targetSeasonIsWinter) {
-                         finalStart = d;
-                         break;
-                     }
-                     d.setDate(d.getDate() + 1);
-                 }
-             }
+            const targetSeasonIsWinter = isWinterDate(first.dateStr, seasonSettings);
 
-             const endStr = toLocalISO(finalEnd);
-             if (isWinterDate(endStr, seasonSettings) !== targetSeasonIsWinter) {
-                 let d = new Date(finalEnd);
-                 while (d > finalStart) {
-                     const dStr = toLocalISO(d);
-                     if (isWinterDate(dStr, seasonSettings) === targetSeasonIsWinter) {
-                         finalEnd = d;
-                         break;
-                     }
-                     d.setDate(d.getDate() - 1);
-                 }
-             }
+            const startStr = toLocalISO(finalStart);
+            if (isWinterDate(startStr, seasonSettings) !== targetSeasonIsWinter) {
+                let d = new Date(finalStart);
+                while (d < finalEnd) {
+                    const dStr = toLocalISO(d);
+                    if (isWinterDate(dStr, seasonSettings) === targetSeasonIsWinter) {
+                        finalStart = d;
+                        break;
+                    }
+                    d.setDate(d.getDate() + 1);
+                }
+            }
+
+            const endStr = toLocalISO(finalEnd);
+            if (isWinterDate(endStr, seasonSettings) !== targetSeasonIsWinter) {
+                let d = new Date(finalEnd);
+                while (d > finalStart) {
+                    const dStr = toLocalISO(d);
+                    if (isWinterDate(dStr, seasonSettings) === targetSeasonIsWinter) {
+                        finalEnd = d;
+                        break;
+                    }
+                    d.setDate(d.getDate() - 1);
+                }
+            }
         }
 
         validFromStr = toLocalISO(finalStart);
         validToStr = toLocalISO(finalEnd);
-    } 
+    }
 
     const { distance, consumption } = calculateGroupConsumption(group, vehicle, seasonSettings || null);
     const endOdo = startOdo + distance;
-    const endFuel = startFuel + fuelFilledSum - consumption; 
+    const endFuel = startFuel + fuelFilledSum - consumption;
 
     const waybillRoutes = [];
     let minMinutes = 24 * 60;
-    let maxMinutes = 0;       
+    let maxMinutes = 0;
     let hasTimes = false;
 
     for (const item of group) {
@@ -308,7 +327,7 @@ export const saveBatchWaybills = async (
     calendarEvents?: CalendarEvent[],
     seasonSettings?: SeasonSettings
 ): Promise<void> => {
-    
+
     let runningOdometer = vehicle.mileage;
     let runningFuel = vehicle.currentFuel || 0;
 
@@ -316,7 +335,7 @@ export const saveBatchWaybills = async (
     const availableBlanks = allBlanks
         .filter(b => b.ownerEmployeeId === config.driverId && b.status === 'issued')
         .sort((a, b) => a.series.localeCompare(b.series) || a.number - b.number);
-    
+
     let blankIndex = 0;
 
     const validItems = items
@@ -331,20 +350,20 @@ export const saveBatchWaybills = async (
 
     for (let i = 0; i < validItems.length; i++) {
         const item = validItems[i];
-        
+
         if (item.routes.length === 0 && !config.createEmptyDays) {
-            continue; 
+            continue;
         }
 
         let startNewGroup = false;
 
         if (currentGroup.length === 0) {
-            startNewGroup = false; 
+            startNewGroup = false;
         } else {
             const firstInGroup = currentGroup[0];
-            const prevInGroup = currentGroup[currentGroup.length - 1]; 
+            const prevInGroup = currentGroup[currentGroup.length - 1];
             const diffTime = item.dateObj.getTime() - firstInGroup.dateObj.getTime();
-            
+
             if (item.dateObj.getMonth() !== firstInGroup.dateObj.getMonth()) {
                 startNewGroup = true;
             }
@@ -354,7 +373,7 @@ export const saveBatchWaybills = async (
             else {
                 const wasWinter = isWinterDate(prevInGroup.dateStr, seasonSettings || null);
                 const isWinter = isWinterDate(item.dateStr, seasonSettings || null);
-                
+
                 if (wasWinter !== isWinter) {
                     startNewGroup = true;
                 } else {
@@ -371,33 +390,33 @@ export const saveBatchWaybills = async (
                         if (currentWeek !== firstWeek) {
                             startNewGroup = true;
                         }
-                    } 
+                    }
                 }
             }
         }
 
         if (startNewGroup && currentGroup.length > 0) {
             const groupFuelFilled = currentGroup.reduce((sum, it) => sum + (it.fuelFilled || 0), 0);
-            
+
             await createWaybillFromGroup(
-                currentGroup, 
-                config, 
-                vehicle, 
-                availableBlanks[blankIndex], 
-                runningOdometer, 
-                runningFuel, 
-                actorId, 
+                currentGroup,
+                config,
+                vehicle,
+                availableBlanks[blankIndex],
+                runningOdometer,
+                runningFuel,
+                actorId,
                 groupFuelFilled,
                 seasonSettings,
                 calendarEvents
             );
-            
+
             const groupDist = currentGroup.reduce((sum, it) => sum + it.totalDistance, 0);
             const { consumption } = calculateGroupConsumption(currentGroup, vehicle, seasonSettings || null);
-            
+
             runningOdometer += groupDist;
             runningFuel = runningFuel + groupFuelFilled - consumption;
-            
+
             if (availableBlanks[blankIndex]) blankIndex++;
             processedGroups++;
             onProgress(i, estimateTotal);
@@ -409,15 +428,15 @@ export const saveBatchWaybills = async (
 
     if (currentGroup.length > 0) {
         const groupFuelFilled = currentGroup.reduce((sum, it) => sum + (it.fuelFilled || 0), 0);
-        
+
         await createWaybillFromGroup(
-            currentGroup, 
-            config, 
-            vehicle, 
-            availableBlanks[blankIndex], 
-            runningOdometer, 
-            runningFuel, 
-            actorId, 
+            currentGroup,
+            config,
+            vehicle,
+            availableBlanks[blankIndex],
+            runningOdometer,
+            runningFuel,
+            actorId,
             groupFuelFilled,
             seasonSettings,
             calendarEvents
@@ -425,4 +444,112 @@ export const saveBatchWaybills = async (
         processedGroups++;
         onProgress(estimateTotal, estimateTotal);
     }
+};
+
+// ============================================================================
+// BLANK AVAILABILITY HELPERS
+// ============================================================================
+
+export interface BlankAvailabilityResult {
+    sufficient: boolean;
+    available: number;
+    required: number;
+    shortage: number;
+}
+
+/**
+ * Рассчитывает количество ПЛ, которые будут созданы из preview items.
+ * Учитывает группировку (day/2days/week/month) и настройки сезонов.
+ */
+export const estimateWaybillCount = (
+    items: BatchPreviewItem[],
+    config: BatchConfig,
+    seasonSettings?: SeasonSettings | null
+): number => {
+    const validItems = items
+        .filter(i => i.isWorking)
+        .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+
+    if (validItems.length === 0) return 0;
+
+    let groupCount = 0;
+    let currentGroup: BatchPreviewItem[] = [];
+
+    for (const item of validItems) {
+        if (item.routes.length === 0 && !config.createEmptyDays) {
+            continue;
+        }
+
+        let startNewGroup = false;
+
+        if (currentGroup.length === 0) {
+            startNewGroup = false;
+        } else {
+            const firstInGroup = currentGroup[0];
+            const prevInGroup = currentGroup[currentGroup.length - 1];
+            const diffTime = item.dateObj.getTime() - firstInGroup.dateObj.getTime();
+
+            if (item.dateObj.getMonth() !== firstInGroup.dateObj.getMonth()) {
+                startNewGroup = true;
+            } else if (item.dateObj.getFullYear() !== firstInGroup.dateObj.getFullYear()) {
+                startNewGroup = true;
+            } else {
+                const wasWinter = isWinterDate(prevInGroup.dateStr, seasonSettings || null);
+                const isWinter = isWinterDate(item.dateStr, seasonSettings || null);
+
+                if (wasWinter !== isWinter) {
+                    startNewGroup = true;
+                } else {
+                    if (config.groupingDuration === 'day') {
+                        startNewGroup = true;
+                    } else if (config.groupingDuration === '2days') {
+                        const gapDays = diffTime / (1000 * 60 * 60 * 24);
+                        if (currentGroup.length >= 2 || gapDays > 1.5) {
+                            startNewGroup = true;
+                        }
+                    } else if (config.groupingDuration === 'week') {
+                        const currentWeek = getISOWeek(item.dateObj);
+                        const firstWeek = getISOWeek(firstInGroup.dateObj);
+                        if (currentWeek !== firstWeek) {
+                            startNewGroup = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (startNewGroup && currentGroup.length > 0) {
+            groupCount++;
+            currentGroup = [];
+        }
+
+        currentGroup.push(item);
+    }
+
+    // Don't forget the last group
+    if (currentGroup.length > 0) {
+        groupCount++;
+    }
+
+    return groupCount;
+};
+
+/**
+ * Проверяет достаточность бланков у водителя.
+ */
+export const checkBlanksAvailability = async (
+    driverId: string,
+    requiredCount: number
+): Promise<BlankAvailabilityResult> => {
+    const allBlanks = await getBlanks();
+    const available = allBlanks.filter(
+        b => b.ownerEmployeeId === driverId && b.status === 'issued'
+    ).length;
+
+    return {
+        sufficient: available >= requiredCount,
+        available,
+        required: requiredCount,
+        shortage: Math.max(0, requiredCount - available)
+    };
 };

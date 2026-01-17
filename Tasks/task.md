@@ -1,24 +1,33 @@
-# Task: Enhancing Dashboard
+# Task: Waybill Logic & UI Improvements
 
-## 🕵️‍♀️ Investigation
-- [x] **Analyze Backend Logic**: Reviewed `dashboardService.ts` and `schema.prisma`.
-- [x] **Analyze Frontend Logic**: Reviewed `Dashboard.tsx`.
-- [x] **Clarify Requirements**: User provided detailed algorithms for 6 widgets.
+## Статус: ✅ ВЫПОЛНЕНО
 
-## 🏗️ Implementation
+**Дата:** 17.01.2026
 
-### Database & Schema
-- [x] **Update `Vehicle` Model**: Added `lastMaintenanceMileage` and `maintenanceIntervalKm`.
-- [x] **Run Migration**: `npx prisma migrate dev` (Done).
+## Цель
+Исправление критических ошибок логики создания путевых листов (резервирование бланков, валидация) и улучшение UX (ручной ввод, блокировка скролла).
 
-### Backend (`dashboardService.ts`)
-- [x] **Implement `getDashboardStats`**: All widgets implemented.
-- [x] **Fix Controller**: Syntax error resolved.
+## Выполненные задачи
 
-### Frontend (`Dashboard.tsx`)
-- [x] **Usability**: Persistence & Auto-refresh implemented.
-- [x] **Layout & Widgets**: All new rows and widgets implemented.
-- [x] **Refinements**: "Top" charts ignore vehicle filter; Improved label readability.
+### Логика и Валидация
+- [x] **Резервирование бланков**: Исправлено дублирование номеров при создании черновиков. Бланки теперь резервируются сразу.
+- [x] **Валидация даты маршрута**: Исправлена ошибка "Дата выходит за пределы" из-за проблем с таймзонами (переход на строковое сравнение).
+- [x] **Формат дат**: Добавлена поддержка ввода даты в формате `DD.MM.YYYY` (авто-конвертация).
+- [x] **Уникальность номеров**: Реализована строгая проверка уникальности номера ПЛ в пределах года (backend-side).
+- [x] **Начальные данные**: ПЛ теперь подтягивают данные (пробег/топливо) из последнего *черновика*, если он свежее проведенного.
 
-## 🔍 Verification
-- [x] **Manual Test**: Code structures verified. Ready for user testing.
+### UI/UX
+- [x] **Ручной ввод номера**: Разблокировано поле "Номер ПЛ" в форме документа.
+- [x] **Блокировка скролла**: Отключено нежелательное изменение значений числовых полей (пробег, топливо, км) прокруткой мыши.
+
+## Изменённые файлы
+
+| Файл | Действие |
+|------|----------|
+| `services/api/waybills.ts` | Валидация уникальности, резервирование бланков, init data logic |
+| `hooks/useWaybillForm.ts` | Валидация дат, нормализация DD.MM.YYYY |
+| `components/waybills/form/WaybillGeneralInfo.tsx` | Разблокировка input номера |
+| `components/waybills/form/WaybillFuelInfo.tsx` | Disable scroll on inputs |
+| `components/waybills/form/WaybillRouteRow.tsx` | Disable scroll on inputs |
+| `Tasks/PROJECT_LOG.md` | Логирование изменений (RU заголовки) |
+| `Tasks/APPLICATION_CONTEXT.md` | Обновление правил (RU заголовки) |

@@ -211,15 +211,29 @@ No change is considered done until a PROJECT_LOG entry exists.
 - Debug/perf: immediately after root cause + fix are found.
 
 ### Entry template
-## YYYY-MM-DD HH:MM (MSK) — Short title
-**Type:** feat | fix | perf | refactor | docs | chore | debug
-**Zone:** vehicles | waybills | modal | repo | validation | ui | fuel | build | deps
-**Context/problem:** 1–2 sentences.
+
+```markdown
+## DD.MM.YYYY.HH:MM — Заголовок на русском языке (обязательно)
+```
+
+> ⚠️ **Язык заголовков:** Заголовки записей (Headers) ДОЛЖНЫ быть на русском языке. Тело записи может быть смешанным, но русский предпочтителен для контекста.
+
+> ⚠️ **Формат даты:** `DD.MM.YYYY.HH:MM` по Уральскому времени (UTC+5).  
+> Пример: `17.01.2026.14:10`
+
+**Type:** feat | fix | perf | refactor | docs | chore | debug  
+**Zone:** vehicles | waybills | modal | repo | validation | ui | fuel | build | deps | blanks | import  
+**Context/problem:** 1–2 sentences.  
 **What was done:**
 - ...
+
 **How verified:**
 - ...
-**Risks/notes:** (optional)
+
+**Files:**
+- [NEW|MODIFY|DELETE] `path/to/file`
+
+**Risks/notes:** (optional)  
 **Links:** files, PR/commit, issue/task.
 
 ### Optional

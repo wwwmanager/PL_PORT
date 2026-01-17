@@ -50,6 +50,7 @@ export interface Route {
   distanceKm: number;
   isCityDriving: boolean;
   isWarming: boolean;
+  isMountainDriving?: boolean;  // COEF-MOUNTAIN-001
   date?: string;
   departureTime?: string;
   arrivalTime?: string;
@@ -115,9 +116,11 @@ export interface Vehicle {
     winterRate: number;
     cityIncreasePercent?: number;
     warmingIncreasePercent?: number;
+    mountainIncreasePercent?: number;  // COEF-MOUNTAIN-001
   };
   useCityModifier?: boolean;
   useWarmingModifier?: boolean;
+  useMountainModifier?: boolean;  // COEF-MOUNTAIN-001
   fuelTankCapacity?: number | null;
   disableFuelCapacityCheck?: boolean;
   osagoSeries?: string | null;

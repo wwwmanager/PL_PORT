@@ -452,7 +452,7 @@ export const VehicleList: React.FC = () => {
                             </div>
 
                             <div className="md:col-span-3 mt-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="p-4 border rounded-lg dark:border-gray-600">
                                         <label className="flex items-center gap-2 mb-2">
                                             <FormCheckbox {...register("useCityModifier")} />
@@ -482,6 +482,22 @@ export const VehicleList: React.FC = () => {
                                                     setValueAs: v => (v === "" || isNaN(Number(v))) ? null : Number(v)
                                                 })}
                                                 disabled={!watch("useWarmingModifier")}
+                                            />
+                                        </FormField>
+                                    </div>
+                                    <div className="p-4 border rounded-lg dark:border-gray-600">
+                                        <label className="flex items-center gap-2 mb-2">
+                                            <FormCheckbox {...register("useMountainModifier")} />
+                                            <span className="font-medium text-gray-700 dark:text-gray-200">Горная местность</span>
+                                        </label>
+                                        <FormField label="Надбавка, %" error={errors.fuelConsumptionRates?.mountainIncreasePercent?.message}>
+                                            <FormInput
+                                                type="number"
+                                                step="0.1"
+                                                {...register("fuelConsumptionRates.mountainIncreasePercent", {
+                                                    setValueAs: v => (v === "" || isNaN(Number(v))) ? null : Number(v)
+                                                })}
+                                                disabled={!watch("useMountainModifier")}
                                             />
                                         </FormField>
                                     </div>

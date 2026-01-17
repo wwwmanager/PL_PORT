@@ -5,8 +5,8 @@ import { DB_KEYS } from '../dbKeys';
 import { broadcast } from '../bus';
 
 export const getAppSettings = async (): Promise<AppSettings> => {
-    const defaults: AppSettings = { 
-        isParserEnabled: true, 
+    const defaults: AppSettings = {
+        isParserEnabled: true,
         appMode: 'driver',
         autoSaveRoutes: true,
         customLogo: null,
@@ -23,7 +23,7 @@ export const getAppSettings = async (): Promise<AppSettings> => {
         }
     };
     const loaded = await loadJSON<AppSettings | null>(DB_KEYS.APP_SETTINGS, null);
-    
+
     if (!loaded) return defaults;
 
     // Merge loaded settings with defaults to ensure all keys exist
@@ -48,16 +48,6 @@ export const getSeasonSettings = async (): Promise<SeasonSettings> => {
 export const saveSeasonSettings = async (settings: SeasonSettings) => {
     await saveJSON(DB_KEYS.SEASON_SETTINGS, settings);
 };
-export const isWinterDate = (dateStr: string, settings: SeasonSettings) => {
-    if (!settings) return false;
-    const date = new Date(dateStr);
-    if (settings.type === 'manual') {
-        const start = new Date(settings.winterStartDate);
-        const end = new Date(settings.winterEndDate);
-        return date >= start && date <= end;
-    } else {
-        const m = date.getMonth() + 1;
-        if (m >= settings.winterMonth || m < settings.summerMonth) return true;
-        return false;
-    }
-};
+
+// Re-export isWinterDate from the single source of truth
+export { isWinterDate } from '../fuelCalculationService';

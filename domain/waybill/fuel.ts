@@ -19,6 +19,7 @@ export const calculateNormConsumption = (
     winter?: number;      // Зимняя надбавка (напр. 0.1)
     city?: number;        // Городской цикл (напр. 0.1)
     warming?: number;     // Прогрев (напр. 0.05)
+    mountain?: number;    // Горная местность COEF-MOUNTAIN-001
     other?: number;
   } = {}
 ): number => {
@@ -28,10 +29,11 @@ export const calculateNormConsumption = (
   // 1. Суммируем все надбавки
   // Пример: Зима (10%) + Город (5%) = 15% (0.15)
   // В некоторых методиках коэффициенты перемножаются, но в ПЛ обычно суммируются к базе.
-  const totalCoeff = (coefficients.winter || 0) + 
-                     (coefficients.city || 0) + 
-                     (coefficients.warming || 0) + 
-                     (coefficients.other || 0);
+  const totalCoeff = (coefficients.winter || 0) +
+    (coefficients.city || 0) +
+    (coefficients.warming || 0) +
+    (coefficients.mountain || 0) +
+    (coefficients.other || 0);
 
   // 2. Считаем расход: (Км / 100) * База * (1 + Коэф)
   const totalConsumption = (distanceKm / 100) * baseNormRate * (1 + totalCoeff);

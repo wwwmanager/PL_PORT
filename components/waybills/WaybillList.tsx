@@ -11,7 +11,7 @@ import {
     useWaybillsPaged,
     useFuelTypes
 } from '../../hooks/queries';
-import { validateBatchCorrection, fetchWaybillById, fixWaybillDates } from '../../services/mockApi';
+import { validateBatchCorrection, fetchWaybillById, fixWaybillDates, fetchWaybillsPaged } from '../../services/mockApi';
 import { WaybillDetail } from './WaybillDetail';
 import WaybillCheckModal from './WaybillCheckModal';
 import SeasonSettingsModal from './SeasonSettingsModal';
@@ -97,12 +97,35 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     const [page, setPage] = useState(1);
     const pageSize = 20;
 
-    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
-        key: 'date',
-        direction: 'desc'
+    // Load persisted sort config
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>(() => {
+        try {
+            const saved = localStorage.getItem('waybillList_sortConfig');
+            if (saved) return JSON.parse(saved);
+        } catch (e) { /* ignore */ }
+        return { key: 'date', direction: 'desc' };
     });
 
+    // Load persisted filters
     const [filters, setFilters] = useState(() => {
+        try {
+            const saved = localStorage.getItem('waybillList_filters');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                // Validate that we have required fields
+                if (parsed.dateFrom !== undefined && parsed.dateTo !== undefined) {
+                    return {
+                        dateFrom: parsed.dateFrom || '',
+                        dateTo: parsed.dateTo || '',
+                        status: (parsed.status || '') as WaybillStatus | '',
+                        vehicleId: parsed.vehicleId || '',
+                        driverId: parsed.driverId || '',
+                    };
+                }
+            }
+        } catch (e) { /* ignore parse errors */ }
+
+        // Default: current month
         const now = new Date();
         const start = new Date(now.getFullYear(), now.getMonth(), 1);
         const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -129,7 +152,15 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
     const totalCount = pagedData?.total || 0;
 
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const [isExtendedMode, setIsExtendedMode] = useState(true);
+
+    // Load persisted extended mode
+    const [isExtendedMode, setIsExtendedMode] = useState(() => {
+        try {
+            const saved = localStorage.getItem('waybillList_isExtendedMode');
+            if (saved !== null) return JSON.parse(saved);
+        } catch (e) { /* ignore */ }
+        return true;
+    });
 
     // Modals
     const [selectedWaybill, setSelectedWaybill] = useState<Waybill | null>(null);
@@ -371,7 +402,25 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
         setFilters(newFilters);
         setPage(1);
         setSelectedIds(new Set());
+        // Persist filters
+        try {
+            localStorage.setItem('waybillList_filters', JSON.stringify(newFilters));
+        } catch (e) { /* ignore */ }
     };
+
+    // Persist sort config on change
+    useEffect(() => {
+        try {
+            localStorage.setItem('waybillList_sortConfig', JSON.stringify(sortConfig));
+        } catch (e) { /* ignore */ }
+    }, [sortConfig]);
+
+    // Persist extended mode on change
+    useEffect(() => {
+        try {
+            localStorage.setItem('waybillList_isExtendedMode', JSON.stringify(isExtendedMode));
+        } catch (e) { /* ignore */ }
+    }, [isExtendedMode]);
 
     const processedData = useMemo(() => {
         const enriched = waybills.map(w => {
@@ -571,6 +620,30 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
         });
     };
 
+    const handleSelectAllFiltered = async () => {
+        setIsBulkProcessing(true);
+        try {
+            // Fetch ALL ids matching current filters
+            // Using a large pageSize to get everything. 
+            // In a real API, we might want a dedicated endpoint or "ids only" mode.
+            const result = await fetchWaybillsPaged({
+                page: 1,
+                pageSize: 100000,
+                filters,
+                sortBy: sortConfig.key,
+                sortDir: sortConfig.direction
+            });
+            const allIds = result.data.map(w => w.id);
+            setSelectedIds(new Set(allIds));
+            showToast(`Выбрано ${allIds.length} документов`, 'success');
+        } catch (e) {
+            console.error(e);
+            showToast('Ошибка при выборе всех документов', 'error');
+        } finally {
+            setIsBulkProcessing(false);
+        }
+    };
+
     const isAllSelected = processedData.length > 0 && processedData.every(w => selectedIds.has(w.id));
 
     const handleSort = (key: string) => {
@@ -687,6 +760,17 @@ const WaybillList: React.FC<WaybillListProps> = ({ waybillToOpen, onWaybillOpene
             {selectedIds.size > 0 && (
                 <div className="flex flex-wrap items-center gap-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg animate-fade-in shadow-sm">
                     <span className="font-semibold text-blue-800 dark:text-blue-300 text-sm ml-2">Выбрано: {selectedIds.size}</span>
+
+                    {isAllSelected && totalCount > selectedIds.size && (
+                        <button
+                            onClick={handleSelectAllFiltered}
+                            disabled={isBulkProcessing}
+                            className="text-xs text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 underline font-medium animate-fade-in"
+                        >
+                            {isBulkProcessing ? 'Загрузка...' : `Выбрать все ${totalCount} документов`}
+                        </button>
+                    )}
+
                     <div className="h-4 w-px bg-blue-200 dark:bg-blue-700"></div>
 
                     {can('waybill.post') && (

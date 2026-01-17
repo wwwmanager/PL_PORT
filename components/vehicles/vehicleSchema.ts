@@ -22,6 +22,7 @@ const fuelConsumptionRatesSchema = z.object({
     winterRate: z.number().positive('Норма должна быть > 0'),
     cityIncreasePercent: z.number().min(0, "Надбавка не может быть отрицательной").nullish(),
     warmingIncreasePercent: z.number().min(0, "Надбавка не может быть отрицательной").nullish(),
+    mountainIncreasePercent: z.number().min(0, "Надбавка не может быть отрицательной").nullish(),  // COEF-MOUNTAIN-001
 });
 
 const maintenanceRecordSchema = z.object({
@@ -109,6 +110,7 @@ export const vehicleSchema = z.object({
     maintenanceHistory: z.array(maintenanceRecordSchema).optional().nullable(),
     useCityModifier: z.boolean().optional(),
     useWarmingModifier: z.boolean().optional(),
+    useMountainModifier: z.boolean().optional(),  // COEF-MOUNTAIN-001
     fuelTankCapacity: z.number().min(0).optional().nullable(),
     disableFuelCapacityCheck: z.boolean().optional(),
 
